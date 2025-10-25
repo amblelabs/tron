@@ -1,0 +1,48 @@
+{
+	"schemaVersion": 1,
+	"id": "tron",
+	"version": "${version}",
+	"name": "Tron",
+	"description": "A digital frontier.",
+	"authors": [
+		"Loqor, OuroborosGames"
+	],
+	"contact": {
+		"homepage": "https://loqor.dev",
+		"sources": "https://github.com/amblelabs/tron"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/tron/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"amble.tron.Tron"
+		],
+        "client": [
+            "amble.tron.client.TronClient"
+        ],
+		"fabric-datagen": [
+			"amble.tron.TronDataGenerator"
+		],
+      "amblekit-main": [
+        "amble.tron.init.AmbleInitializer"
+      ],
+      "amblekit-client": [
+        "amble.tron.init.client.AmbleClientInitializer"
+      ]
+	},
+	"mixins": [
+		"tron.mixins.json"
+	],
+    "depends": {
+      "fabricloader": ">=${loader_version}",
+      "minecraft": "${minecraft_version}",
+      "java": ">=17",
+      "fabric-api": "*",
+      "yet_another_config_lib_v3": ">=${yacl_version}",
+      "amblekit": ">=1.1.14-1.20.1-beta"
+    },
+	"suggests": {
+		"another-mod": "*"
+	}
+}

@@ -1,0 +1,45 @@
+{
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "tron:item/identity_disc"
+  },
+  "display": {
+    "thirdperson_righthand": {
+      "rotation": [100, -90, 0],
+      "translation": [0, -2, 2.5]
+    },
+    "thirdperson_lefthand": {
+      "rotation": [100, 90, 0],
+      "translation": [0, -2, 2.5]
+    },
+    "firstperson_righthand": {
+      "rotation": [120, 90, -180],
+      "translation": [1, 4.75, -5.25],
+      "scale": [1.5, 1.5, 1.5]
+    },
+    "firstperson_lefthand": {
+      "rotation": [120, -90, -180],
+      "translation": [1, 4.75, -5.25],
+      "scale": [1.5, 1.5, 1.5]
+    },
+    "ground": {
+      "rotation": [90, 0, 0],
+      "translation": [0, -2.5, 4]
+    },
+    "gui": {
+      "rotation": [-37.09, -19.06, -127.64],
+      "translation": [4.5, -2.25, 0],
+      "scale": [1.5, 1.5, 1.5]
+    },
+    "head": {
+      "rotation": [90, 0, 90],
+      "translation": [-6, 11, 0],
+      "scale": [1.5, 1.5, 1.5]
+    },
+    "fixed": {
+      "rotation": [0, 0, -67.5],
+      "translation": [5.5, 2.25, 0],
+      "scale": [1.5, 1.5, 1.5]
+    }
+  }
+}
