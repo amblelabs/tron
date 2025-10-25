@@ -1,10 +1,8 @@
 package amble.tron.client.features;
 
-import amble.tron.LightSuitItem;
+import amble.tron.core.items.LightSuitItem;
 import amble.tron.Tron;
-import amble.tron.client.models.IdentityDiscModel;
 import amble.tron.core.items.IdentityDiscItem;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
@@ -17,11 +15,11 @@ import net.minecraft.client.render.model.json.ModelTransformationMode;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.decoration.ArmorStandEntity;
+import net.minecraft.entity.player.ItemCooldownManager;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.RotationAxis;
-import org.jetbrains.annotations.Nullable;
+import org.joml.Vector3f;
 
 @Environment(value = EnvType.CLIENT)
 public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M extends PlayerEntityModel<T> & ModelWithArms>
@@ -57,7 +55,9 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
             }
         }*/
 
-        boolean bl = livingEntity.getEquippedStack(EquipmentSlot.CHEST).getItem() instanceof LightSuitItem;
+        ItemStack stack = livingEntity.getEquippedStack(EquipmentSlot.CHEST);
+
+        boolean bl = stack.getItem() instanceof LightSuitItem;
 
         this.model.head.visible = bl;
         this.model.hat.visible = bl;
@@ -79,26 +79,38 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
         this.model.leftLeg.copyTransform(getContextModel().leftLeg);
         this.model.rightLeg.copyTransform(getContextModel().rightLeg);
 
-        VertexConsumer vertexConsumer = vertexConsumerProvider.getBuffer(RenderLayer.getEntityTranslucent(LIGHTSUIT_TEXTURE));
-        VertexConsumer light = vertexConsumerProvider.getBuffer(RenderLayer.getEyes(LIGHTSUIT_LIGHTS));
-        VertexConsumerProvider provider = layer1 -> vertexConsumer != light
-                ? VertexConsumers.union(vertexConsumer, light)
-                : vertexConsumer;
         this.model.render(matrixStack, vertexConsumerProvider.getBuffer(RenderLayer.getEntityTranslucent(LIGHTSUIT_TEXTURE)), i, OverlayTexture.DEFAULT_UV, 1, 1, 1, 1f);
 
-        float[] defaultProgram = new float[]{0.5f, 0.9f, 1.0f};
-        float[] rectified = new float[]{1f, 0.5f, 0.1f};
-        float[] user = new float[]{1f, 1f, 1f};
-        float[] finalProgram = user;
-        this.model.render(matrixStack, vertexConsumerProvider.getBuffer(RenderLayer.getEyes(LIGHTSUIT_LIGHTS)), 0xf000f0, OverlayTexture.DEFAULT_UV, finalProgram[0], finalProgram[1], finalProgram[2], 1f);
+        Vector3f defaultProgram = new Vector3f(0.5f, 0.7f, 1.0f);
+        Vector3f rectified = new Vector3f(1f, 0.5f, 0.1f);
+        Vector3f utility = new Vector3f(0.2f, 0.9f, 0.5f);
+        Vector3f user = new Vector3f(1f, 1f, 1f);
+        Vector3f theoSpecific = new Vector3f(1, 0, 0);
+        Vector3f finalProgram = theoSpecific;
+        if (stack.getItem() instanceof LightSuitItem lightSuitItem) {
+            if (finalProgram != lightSuitItem.getRGB(stack)) {
+                lightSuitItem.setRGB(finalProgram, stack);
+            }
+            this.model.render(matrixStack, vertexConsumerProvider.getBuffer(RenderLayer.getEyes(LIGHTSUIT_LIGHTS)), i, OverlayTexture.DEFAULT_UV,
+                    lightSuitItem.getRGB(stack).x, lightSuitItem.getRGB(stack).y, lightSuitItem.getRGB(stack).z, 1f);
+        }
 
         matrixStack.pop();
 
         matrixStack.push();
+        matrixStack.multiply(RotationAxis.POSITIVE_X.rotation(this.getContextModel().body.pitch));
+        matrixStack.multiply(RotationAxis.POSITIVE_Y.rotation(this.getContextModel().body.yaw));
         matrixStack.scale(0.6f, 0.6f, 0.6f);
-        matrixStack.translate(0, 0.3f, 0.25f);
+        matrixStack.translate(0, 0.3f + (livingEntity.isInSneakingPose() ? 0.3 : 0), 0.25f - (livingEntity.isInSneakingPose() ? 0.15 : 0));
         matrixStack.multiply(RotationAxis.NEGATIVE_Z.rotationDegrees(90));
-        MinecraftClient.getInstance().getItemRenderer().renderItem(livingEntity, livingEntity.getInventory().getStack(0), ModelTransformationMode.FIXED, false, matrixStack, vertexConsumerProvider,null, i, OverlayTexture.DEFAULT_UV, 0);
+        ItemStack disc = livingEntity.getInventory().getStack(0);
+        if (disc.getItem() instanceof IdentityDiscItem discItem && disc != livingEntity.getMainHandStack() && !livingEntity.getItemCooldownManager().isCoolingDown(disc.getItem())) {
+            if (finalProgram != discItem.getRGB(disc)) {
+                discItem.setRGB(finalProgram, disc);
+            }
+            MinecraftClient.getInstance().getItemRenderer().renderItem(livingEntity, disc, ModelTransformationMode.FIXED,
+                    false, matrixStack, vertexConsumerProvider, null, i, OverlayTexture.DEFAULT_UV, 0);
+        }
         matrixStack.pop();
     }
 

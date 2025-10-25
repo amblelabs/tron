@@ -2,7 +2,9 @@ package amble.tron.mixin;
 
 import amble.tron.client.models.IdentityDiscModel;
 import amble.tron.core.TronItems;
+import amble.tron.core.items.IdentityDiscItem;
 import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.item.ItemRenderer;
 import net.minecraft.client.render.model.BakedModel;
@@ -50,15 +52,18 @@ public class ItemRendererMixin {
         if (!stack.isOf(TronItems.IDENTITY_DISC))
             return;
 
+        if (!(stack.getItem() instanceof IdentityDiscItem discItem)) return;
+
         matrices.push();
 
         matrices.translate(-0.5f, -0.5f, -0.5f);
         matrices.scale(1.0f, -1.0f, -1.0f);
 
-        discModel.setAngles(matrices, renderMode, leftHanded);
+        discModel.setAngles(matrices, renderMode, leftHanded, discItem.isBladeRetracted(stack));
 
         discModel.render(matrices, vertexConsumers.getBuffer(discModel.getLayer(IDENTITY_DISC_TEXTURE)), light, overlay, 1, 1, 1, 1);
-        discModel.render(matrices, vertexConsumers.getBuffer(RenderLayer.getEyes(IDENTITY_DISC_EMISSION)), 0xf000f0, overlay, 1, 1, 1, 1);
+        RenderLayer renderLayer = renderMode == ModelTransformationMode.FIRST_PERSON_LEFT_HAND || renderMode == ModelTransformationMode.FIRST_PERSON_RIGHT_HAND ? RenderLayer.getEntityCutoutNoCullZOffset(IDENTITY_DISC_EMISSION) : RenderLayer.getEyes(IDENTITY_DISC_EMISSION);
+        discModel.render(matrices, vertexConsumers.getBuffer(renderLayer), 0xf000f0, overlay, discItem.getRGB(stack).x, discItem.getRGB(stack).y, discItem.getRGB(stack).z, 1);
 
         matrices.pop();
         ci.cancel();

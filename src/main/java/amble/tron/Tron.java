@@ -1,5 +1,7 @@
 package amble.tron;
 
+import amble.tron.core.Keybindings;
+import amble.tron.core.TronEntities;
 import amble.tron.core.TronItems;
 import dev.amble.lib.container.RegistryContainer;
 import net.fabricmc.api.ModInitializer;
@@ -20,5 +22,7 @@ public class Tron implements ModInitializer {
 	@Override
 	public void onInitialize() {
         RegistryContainer.register(TronItems.class, MOD_ID);
+        RegistryContainer.register(TronEntities.class, MOD_ID);
+        Keybindings.init();
 	}
 }

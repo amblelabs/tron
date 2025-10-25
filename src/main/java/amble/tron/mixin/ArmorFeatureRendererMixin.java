@@ -1,6 +1,6 @@
 package amble.tron.mixin;
 
-import amble.tron.LightSuitItem;
+import amble.tron.core.items.LightSuitItem;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

@@ -1,6 +1,6 @@
 package amble.tron.core;
 
-import amble.tron.LightSuitItem;
+import amble.tron.core.items.LightSuitItem;
 import amble.tron.core.items.IdentityDiscItem;
 import dev.amble.lib.container.impl.ItemContainer;
 import dev.amble.lib.item.AItemSettings;

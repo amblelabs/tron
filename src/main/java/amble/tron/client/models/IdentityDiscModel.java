@@ -13,12 +13,14 @@ import net.minecraft.util.math.RotationAxis;
 
 public class IdentityDiscModel extends Model {
 	private final ModelPart identity_disc;
+	private final ModelPart blade;
     public static final Identifier IDENTITY_DISC_TEXTURE = Tron.of("textures/item/identity_disc.png");
     public static final Identifier IDENTITY_DISC_EMISSION = Tron.of("textures/item/identity_disc_emission.png");
 	public IdentityDiscModel(ModelPart root) {
         super(RenderLayer::getEntityTranslucent);
         this.identity_disc = root.getChild("identity_disc");
-	}
+        this.blade = this.identity_disc.getChild("blade");
+    }
     public static TexturedModelData getTexturedModelData() {
         ModelData modelData = new ModelData();
         ModelPartData modelPartData = modelData.getRoot();
@@ -28,8 +30,9 @@ public class IdentityDiscModel extends Model {
                 .uv(16, 8).cuboid(-3.5F, -3.5F, -0.5F, 7.0F, 7.0F, 1.0F, new Dilation(0.15F))
                 .uv(17, 0).cuboid(-3.5F, -1.5F, -0.5F, 2.0F, 3.0F, 1.0F, new Dilation(0.0F))
                 .uv(0, 22).cuboid(-3.0F, -3.0F, -0.7F, 6.0F, 6.0F, 0.0F, new Dilation(0.1F))
-                .uv(0, 0).cuboid(-4.0F, -4.0F, 0.0F, 8.0F, 8.0F, 0.0F, new Dilation(0.01F))
                 .uv(0, 22).cuboid(-3.0F, -3.0F, 0.7F, 6.0F, 6.0F, 0.0F, new Dilation(0.1F)), ModelTransform.pivot(0.0F, 20.0F, 0.0F));
+
+        ModelPartData blade = identity_disc.addChild("blade", ModelPartBuilder.create().uv(0, 0).cuboid(-4.0F, -4.0F, 0.0F, 8.0F, 8.0F, 0.0F, new Dilation(0.01F)), ModelTransform.pivot(0.0F, 0.0F, 0.0F));
         return TexturedModelData.of(modelData, 32, 32);
     }
 	@Override
@@ -37,7 +40,9 @@ public class IdentityDiscModel extends Model {
         identity_disc.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
 	}
 
-    public void setAngles(MatrixStack matrices, ModelTransformationMode renderMode, boolean left) {
+    public void setAngles(MatrixStack matrices, ModelTransformationMode renderMode, boolean left, boolean bladeRetracted) {
+
+        this.blade.visible = !bladeRetracted;
 
          matrices.translate(-0.75, -0.5, -0.5);
 
