@@ -116,7 +116,7 @@ public class IdentityDiscItem extends Item {
         }
 
         ItemCooldownManager cooldownManager = user.getItemCooldownManager();
-        cooldownManager.set(this, 40);
+        //cooldownManager.set(this, 40);
 
         return TypedActionResult.success(itemStack, world.isClient());
     }

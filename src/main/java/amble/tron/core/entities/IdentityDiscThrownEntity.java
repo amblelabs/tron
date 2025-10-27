@@ -2,6 +2,7 @@ package amble.tron.core.entities;
 
 import amble.tron.core.TronEntities;
 import amble.tron.core.TronItems;
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
@@ -12,6 +13,7 @@ import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.PersistentProjectileEntity;
+import net.minecraft.entity.projectile.ProjectileUtil;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.particle.ItemStackParticleEffect;
@@ -20,7 +22,11 @@ import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
+import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
@@ -28,42 +34,67 @@ import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Vector;
 
+/**
+ * Identity Disc with clear, physically consistent per-tick integration and bounce handling.
+ *
+ * Key choices and invariants:
+ * - Integration: semi-implicit (symplectic) Euler per tick. Apply acceleration, then update position via base class.
+ * - Gravity is an acceleration (units/tick^2) and applied independent of mass.
+ * - Linear drag is an exponential-style damping applied to full velocity each tick.
+ * - On block collision, velocity is decomposed into normal and tangential components:
+ *     * Normal component is reversed and scaled by restitution (v_n' = -restitution * v_n) only when moving into the surface.
+ *     * Tangential component is reduced by a tangential damping factor (simple friction model).
+ * - Disc settles when surface contact or kinetic energy falls below a small threshold.
+ * - Spin is independent and damped multiplicatively per tick.
+ */
 public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
 
     private static final TrackedData<Boolean> IN_GROUND = DataTracker.registerData(IdentityDiscThrownEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
     private static final TrackedData<Vector3f> COLOR = DataTracker.registerData(IdentityDiscThrownEntity.class, TrackedDataHandlerRegistry.VECTOR3F);
-    //private static final TrackedData<Boolean> RETRACTED = DataTracker.registerData(IdentityDiscThrownEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
 
-    private ItemStack cleaverStack;
-    private boolean dealtDamage;
-    public int returnTimer;
+    private ItemStack discStack;
+    private boolean dealtDamage = false;
+
+    // PHYSICS PARAMETERS (tweak as needed)
+    private final double mass = 1.0;                   // (kept for future impulses) [unused for gravity here]
+    private final double gravity = -0.04;              // acceleration (units / tick^2) downward
+    private final double linearDrag = 0.02;            // fraction removed per tick (0..1)
+    private final double restitution = 0.45;           // bounciness (0..1)
+    private final double tangentialDamping = 0.60;     // fraction of tangential velocity removed on contact (0..1)
+    private final double settleSpeedThreshold = 0.01;  // speed below which entity will settle
+    private final int maxBouncesBeforeSettle = 6;      // safety cap to stop prolonged bouncing
+
+    // rotational state
+    private float spin = 0.0f;                         // angular speed (arbitrary units)
+    private float spinDamping = 0.98f;                 // multiplicative damping per tick (close to 1)
+
+    // bounce tracking
+    private int bounceCount = 0;
+
+    // tracking list (kept minimal)
     private final List<Entity> trackedTargets = new ArrayList<>();
-    private int targetsHit = 0;
-    private int targetCount = 0;
-    private int homingTicks = 0;
 
     public IdentityDiscThrownEntity(EntityType<IdentityDiscThrownEntity> entityType, World world) {
         super(entityType, world);
-        this.cleaverStack =  new ItemStack(TronItems.IDENTITY_DISC);
+        this.discStack = new ItemStack(TronItems.IDENTITY_DISC);
     }
 
     public IdentityDiscThrownEntity(World world, LivingEntity owner) {
         super(TronEntities.IDENTITY_DISC, owner, world);
-        this.cleaverStack =  new ItemStack(TronItems.IDENTITY_DISC);
+        this.discStack = new ItemStack(TronItems.IDENTITY_DISC);
     }
 
     public IdentityDiscThrownEntity(World world, double x, double y, double z) {
         super(TronEntities.IDENTITY_DISC, x, y, z, world);
-        this.cleaverStack =  new ItemStack(TronItems.IDENTITY_DISC);
+        this.discStack = new ItemStack(TronItems.IDENTITY_DISC);
     }
 
     public IdentityDiscThrownEntity(World world, PlayerEntity player, ItemStack itemStack) {
         super(TronEntities.IDENTITY_DISC, player, world);
-        this.cleaverStack = itemStack;
+        this.discStack = itemStack;
+        this.spin = 20.0f + this.random.nextFloat() * 40.0f;
     }
-
 
     @Override
     protected void initDataTracker() {
@@ -93,204 +124,198 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
         return this.dataTracker.get(COLOR);
     }
 
-    public void handleStatus(byte status) {
-        if (status == 3) {
-            ParticleEffect particleEffect = this.getParticleParameters();
-
-            for(int i = 0; i < 8; ++i) {
-                this.getWorld().addParticle(particleEffect, this.getX(), this.getY(), this.getZ(), 0.0F, 0.0F, 0.0F);
-            }
-        }
-
-    }
-
     @Override
     public boolean hasNoGravity() {
         return true;
     }
 
     public ItemStack asItemStack() {
-        return this.cleaverStack;
+        return TronItems.IDENTITY_DISC.getDefaultStack();
     }
 
     @Override
     public void onDataTrackerUpdate(List<DataTracker.SerializedEntry<?>> dataEntries) {
+        super.onDataTrackerUpdate(dataEntries);
+        // Keep local state consistent with tracked color (no logic here beyond sync).
         this.setColor(this.getDataTracker().get(COLOR));
     }
 
     @Override
     protected void onEntityHit(EntityHitResult entityHitResult) {
-        Entity entity = entityHitResult.getEntity();
-        if (entity == this.getOwner()) return;
-        float f = 8.0F;
-        if (entity instanceof LivingEntity livingEntity) {
-            f += EnchantmentHelper.getAttackDamage(this.cleaverStack, livingEntity.getGroup());
-        }
+        Entity target = entityHitResult.getEntity();
+        if (target == this.getOwner()) return;
 
         Entity owner = this.getOwner();
         DamageSource damageSource = this.getDamageSources().thrown(this, owner == null ? this : owner);
-        SoundEvent soundEvent = SoundEvents.ITEM_TRIDENT_HIT;
+        float baseDamage = 7.0f;
 
-        double radius = 20;
-        // Initialize targets if not already
-        if (trackedTargets.isEmpty()) {
-            for (Entity nearby : this.getWorld().getOtherEntities(this, this.getBoundingBox().expand(radius))) {
-                if (nearby == owner || !(nearby instanceof LivingEntity) || nearby.isRemoved()) continue;
-                trackedTargets.add(nearby);
-            }
-            targetCount = trackedTargets.size();
-            targetsHit = 0;
-            homingTicks = 0;
+        if (target instanceof LivingEntity living) {
+            baseDamage += EnchantmentHelper.getAttackDamage(this.discStack, living.getGroup());
         }
 
-        // Remove the just-hit entity from the list
-        trackedTargets.remove(entity);
-
-        // Damage the current entity
-        if (entity.damage(damageSource, 7.0f)) {
-            if (entity.getType() != EntityType.ENDERMAN && owner instanceof LivingEntity) {
-                EnchantmentHelper.onUserDamaged((LivingEntity) entity, owner);
-                EnchantmentHelper.onTargetDamaged((LivingEntity) owner, entity);
+        if (target.damage(damageSource, baseDamage)) {
+            if (target instanceof LivingEntity livingTarget && owner instanceof LivingEntity) {
+                EnchantmentHelper.onUserDamaged(livingTarget, owner);
+                EnchantmentHelper.onTargetDamaged((LivingEntity) owner, livingTarget);
+                this.onHit(livingTarget);
             }
-            if (entity instanceof LivingEntity livingEntity2) {
-                if (owner instanceof LivingEntity) {
-                    EnchantmentHelper.onUserDamaged(livingEntity2, owner);
-                    EnchantmentHelper.onTargetDamaged((LivingEntity)owner, livingEntity2);
-                }
-                this.onHit(livingEntity2);
-            }
-            targetsHit++;
-        }
-
-        // Set velocity to zero and wait for tick to move to next target
-
-        this.setVelocity(0, 0, 0);
-        // If there are more targets, immediately home to the next one
-        if (!trackedTargets.isEmpty()) {
-            Entity nextTarget = null;
-            double minDist = Double.MAX_VALUE;
-            for (Entity target : trackedTargets) {
-                if (target.isRemoved() || !target.isAlive()) continue;
-                double dist = this.getPos().distanceTo(target.getEyePos());
-                if (dist < minDist) {
-                    minDist = dist;
-                    nextTarget = target;
-                }
-            }
-            if (nextTarget instanceof LivingEntity living) {
-                Vec3d toTarget = living.getEyePos().subtract(this.getPos()).normalize();
-                this.setVelocity(toTarget.multiply(1.5));
-            }
-            homingTicks = 0;
-            this.dealtDamage = false;
-        } else {
-            // If no more targets, start returning to owner
-            if (owner != null) {
-                Vec3d toOwner = owner.getEyePos().subtract(this.getPos()).normalize();
-                this.setVelocity(toOwner.multiply(1.5));
-            }
-            this.returnTimer = Math.max(0, this.returnTimer - 10);
-            targetCount = 0;
-            targetsHit = 0;
             this.dealtDamage = true;
         }
-        homingTicks = 0;
 
-        float g = 1.0F;
-        this.playSound(soundEvent, g, 1.0F);
+        // Reduce speed after hitting an entity to simulate energy loss
+        Vec3d prevVel = this.getVelocity();
+        this.setVelocity(prevVel.multiply(0.55)); // lose ~45% of speed on impact with entity
+        this.playSound(getHitSound(), 1.0F, 1.0F);
     }
 
     @Override
     public void tick() {
-        if (!trackedTargets.isEmpty()) {
-            homingTicks++;
-            // If we have more targets, home to the next one after a short delay
-            if (this.getVelocity().lengthSquared() == 0 && homingTicks > 3) {
-                Entity nextTarget = null;
-                double minDist = Double.MAX_VALUE;
-                for (Entity target : trackedTargets) {
-                    if (target.isRemoved() || !target.isAlive()) continue;
-                    double dist = this.getPos().distanceTo(target.getEyePos());
-                    if (dist < minDist) {
-                        minDist = dist;
-                        nextTarget = target;
+
+        if (!this.getWorld().isClient() && this.getOwner() != null) {
+            if (this.getOwner() instanceof PlayerEntity player) {
+                Vec3d vec3d = player.getCameraPosVec(1.0f);
+                Vec3d vec3d2 = player.getRotationVec(1.0F);
+                Vec3d vec3d3 = vec3d.add(vec3d2.x * 10, vec3d2.y * 10, vec3d2.z * 10);
+                Box box = player.getBoundingBox().stretch(vec3d2.multiply(10)).expand(1.0, 1.0, 1.0);
+
+                EntityHitResult entityHitResult = ProjectileUtil.raycast(player, vec3d, vec3d3, box, (entity) -> entity == this, 1000);
+                if (entityHitResult != null) {
+                    if (player.isSneaking()) {
+                        this.tryPickup(player);
+                        this.discard();
                     }
-                }
-                if (nextTarget != null) {
-                    Vec3d toTarget = nextTarget.getEyePos().subtract(this.getPos()).normalize();
-                    toTarget = new Vec3d(toTarget.x, toTarget.y, toTarget.z).normalize();
-                    this.setVelocity(toTarget.multiply(1.5));
-                    homingTicks = 0;
-                }
-            }
-            if (targetsHit >= targetCount || homingTicks > 40) {
-                trackedTargets.clear();
-                targetCount = 0;
-                targetsHit = 0;
-                homingTicks = 0;
-                this.dealtDamage = true;
+               }
             }
         }
-        if (this.inGroundTime > 4) {
-            this.dealtDamage = true;
-        }
-
-        Entity entity = this.getOwner();
-        boolean shouldReturnQuickly = this.age > 4 && !this.isInGroundTracked();
-
-        // Sync tracked inGround value
+        // Ensure tracked flag stays in-sync with internal state
         this.setInGround(this.inGround);
 
-        if ((this.dealtDamage || shouldReturnQuickly) && entity != null && !this.isRemoved()) {
-            if (!this.isOwnerAlive()) {
-                if (!this.getWorld().isClient && this.pickupType == PickupPermission.ALLOWED) {
-                    this.dropStack(this.asItemStack(), 0.1F);
-                }
-                this.discard();
-            } else {
-                if (!this.isInGroundTracked()) {
-                    Vec3d vec3d = entity.getEyePos().subtract(this.getPos());
-                    this.setYaw((float)(Math.toDegrees(Math.atan2(vec3d.z, vec3d.x)) - 90.0));
-                    this.setPitch((float)(-Math.toDegrees(Math.atan2(vec3d.y, Math.sqrt(vec3d.x * vec3d.x + vec3d.z * vec3d.z)))));
-                    double speedMultiplier = shouldReturnQuickly ? 1.5 : 0.05;
-                    if (this.returnTimer < 20) {
-                        speedMultiplier = 0.05; // Slow return for first 20 ticks
-                    } else {
-                        speedMultiplier = 0.5; // Fast return after timer elapses
-                    }
-                    this.setPos(this.getX(), this.getY() + vec3d.y * 0.015 * 0.1d, this.getZ());
-                    if (this.getWorld().isClient) {
-                        this.lastRenderY = this.getY();
-                    }
-                    this.setVelocity(this.getVelocity().multiply(0.95).add(vec3d.normalize().multiply(speedMultiplier)));
-                    if (this.returnTimer == 0) {
-                        this.playSound(SoundEvents.ITEM_TRIDENT_HIT,8.0f,1.4f);
-                    }
-                    if (this.returnTimer < 40) { // Increase to require more ticks before fast return
-                        ++this.returnTimer;
-                    }
-
-                    // Check if cleaver intersects owner's hitbox to give back the cleaver
-                    if (entity instanceof PlayerEntity player) {
-                        if (player.getBoundingBox().intersects(this.getBoundingBox())) {
-                            if (this.tryPickup(player)) {
-                                this.playSound(SoundEvents.ENTITY_ITEM_PICKUP, 1, 1);
-                                this.discard();
-                                return;
-                            }
-                        }
-                    }
-                }
+        // If settled, keep minimal behavior and allow pickup
+        if (this.isInGroundTracked()) {
+            this.spin *= spinDamping;
+            if (this.getWorld().isClient && this.random.nextInt(20) == 0) {
+                this.getWorld().addParticle(ParticleTypes.CRIT, this.getX(), this.getY() + 0.1, this.getZ(),
+                        0.0, 0.0, 0.0);
             }
+            super.tick();
+            return;
         }
+
+        // --- PHYSICS INTEGRATION: Semi-implicit Euler (symplectic) ---
+        // 1) Apply accelerations to velocity (gravity)
+        Vec3d vel = this.getVelocity();
+        Vec3d accel = new Vec3d(0.0, gravity, 0.0); // gravity is negative for downward acceleration
+        vel = vel.add(accel); // dt = 1 tick
+
+        // 2) Apply linear drag (simple multiplicative damping)
+        double dragFactor = Math.max(0.0, 1.0 - linearDrag); // clamp to prevent negative
+        vel = vel.multiply(dragFactor);
+
+        // 3) Update spin (purely visual/rotational, not affecting translation)
+        this.spin *= spinDamping;
+        if (Math.abs(this.spin) < 0.01f) this.spin = 0.0f;
+
+        // 4) Commit velocity and let base class handle movement and collisions
+        this.setVelocity(vel);
         super.tick();
-        Vec3d vec3d = this.getVelocity();
-        double d = this.getX() + vec3d.x;
-        double e = this.getY() + vec3d.y;
-        double f = this.getZ() + vec3d.z;
-        this.getWorld().addParticle(ParticleTypes.CRIT, d - vec3d.x * 0.25 +
-                this.random.nextDouble() * 0.6 - 0.3, e - vec3d.y * 0.25 - 0.5, f - vec3d.z * 0.25 +
-                this.random.nextDouble() * 0.6 - 0.3, vec3d.x, vec3d.y, vec3d.z);
+
+        // After movement/collision callbacks, evaluate settling conditions:
+        Vec3d postVel = this.getVelocity();
+        double speedSq = postVel.lengthSquared();
+
+        // If on ground or very slow, settle and zero velocity
+        if (this.isOnGround() || speedSq < settleSpeedThreshold * settleSpeedThreshold) {
+            this.inGround = true;
+            this.setInGround(true);
+            this.setVelocity(Vec3d.ZERO);
+            this.spin = 0.0f;
+            return;
+        }
+
+        // spawn particles client-side while flying
+        if (this.getWorld().isClient) {
+            Vec3d pos = this.getPos();
+            this.getWorld().addParticle(getParticleParameters(), pos.x, pos.y, pos.z,
+                    postVel.x * 0.1, postVel.y * 0.1, postVel.z * 0.1);
+        }
+
+        // Note: return-to-owner is intentionally disabled; placeholder left for future use.
+    }
+
+    /**
+     * Consistent bounce handling:
+     * - Decompose current velocity into normal and tangential parts relative to the collision normal.
+     * - If the disc is moving into the surface (v_n < 0), reverse and scale normal component by restitution.
+     * - Reduce tangential component by a tangential damping factor (friction approximation).
+     * - If after-bounce kinetic energy is below threshold or bounce count exceeded, settle on surface.
+     */
+    @Override
+    protected void onBlockHit(BlockHitResult blockHitResult) {
+        if (this.isRemoved()) return;
+
+        Vec3d vel = this.getVelocity();
+        Direction side = blockHitResult.getSide();
+        Vec3d normal = new Vec3d(side.getOffsetX(), side.getOffsetY(), side.getOffsetZ()).normalize();
+
+        // Project velocity onto normal (v_n) and tangential (v_t = v - v_n * n)
+        double v_n = vel.dotProduct(normal); // positive when moving in direction of normal
+        Vec3d normalComponent = normal.multiply(v_n);
+        Vec3d tangential = vel.subtract(normalComponent);
+
+        // Ensure the entity is not marked as grounded before applying bounce response
+        this.inGround = false;
+        this.setInGround(false);
+
+        // Local bounce parameters
+        double restitutionLocal;
+        double tangentialFactor;
+        double globalDamping = 0.995; // slight global damping to avoid perpetual micro-bounce
+
+        if (side.getAxis() == Direction.Axis.Y) {
+            if (side == Direction.DOWN) {
+                // floor bounce: allow bounce (don't discard) and keep it slightly bouncier
+                restitutionLocal = Math.min(1.0, restitution * 1.2);
+                tangentialFactor = 0.85;
+            } else {
+                // ceiling
+                restitutionLocal = restitution;
+                tangentialFactor = Math.max(0.0, 1.0 - tangentialDamping);
+            }
+        } else {
+            // walls: be bouncier and preserve tangential speed
+            restitutionLocal = Math.min(1.0, restitution * 1.35);
+            tangentialFactor = 0.9;
+        }
+
+        Vec3d newNormalComp;
+        if (v_n < 0) {
+            // moving into surface: reflect with restitution
+            double v_n_after = -v_n * restitutionLocal;
+            newNormalComp = normal.multiply(v_n_after);
+            this.bounceCount++;
+        } else {
+            // moving away from surface: keep normal part
+            newNormalComp = normalComponent;
+        }
+
+        // Apply tangential damping (friction) and global damping
+        Vec3d newTangential = tangential.multiply(tangentialFactor);
+        Vec3d after = newNormalComp.add(newTangential).multiply(globalDamping);
+
+        // If speed is below threshold or too many bounces, settle
+        if (after.lengthSquared() < settleSpeedThreshold * settleSpeedThreshold || this.bounceCount > maxBouncesBeforeSettle) {
+            this.setVelocity(Vec3d.ZERO);
+            this.inGround = true;
+            this.setInGround(true);
+            this.spin = 0.0f;
+            this.playSound(SoundEvents.BLOCK_ANVIL_LAND, 0.01f, 1.0F);
+        } else {
+            this.setVelocity(after);
+            this.playSound(SoundEvents.BLOCK_ANVIL_LAND, 0.01f, 0.9F + this.random.nextFloat() * 0.2F);
+        }
+
+        // Call super after applying custom bounce so base logic doesn't prematurely zero velocity.
+        //super.onBlockHit(blockHitResult);
     }
 
     private boolean isOwnerAlive() {
@@ -308,12 +333,12 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
 
     @Nullable
     protected EntityHitResult getEntityCollision(Vec3d currentPosition, Vec3d nextPosition) {
-        return this.dealtDamage ? null : super.getEntityCollision(currentPosition, nextPosition);
+        return super.getEntityCollision(currentPosition, nextPosition);
     }
 
     @Override
     protected boolean tryPickup(PlayerEntity player) {
-        boolean bl = switch (this.pickupType) {
+        boolean allowed = switch (this.pickupType) {
             case ALLOWED -> {
                 boolean isFull = player.getInventory().getEmptySlot() == -1;
                 boolean inserted = !player.isCreative() && !isFull && player.getInventory().insertStack(this.asItemStack());
@@ -326,22 +351,17 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
             case CREATIVE_ONLY -> player.getAbilities().creativeMode;
             default -> false;
         };
-        // In creative mode, allow pickup for discard logic, but don't insert into inventory
-        return this.isInGroundTracked() && (bl || player.isCreative()) || (/*this.isNoClip() && */this.isOwner(player));
+        return this.isInGroundTracked() && (allowed || player.isCreative()) || this.isOwner(player);
     }
 
-
     protected SoundEvent getHitSound() {
-        return SoundEvents.ITEM_TRIDENT_HIT;
+        return SoundEvents.BLOCK_WOOL_FALL;
     }
 
     public void onPlayerCollision(PlayerEntity player) {
         if ((this.isOwner(player) || this.getOwner() == null) && !this.getWorld().isClient) {
             if ((this.isInGroundTracked() /*|| this.isNoClip()*/) && this.shake <= 0) {
                 if (this.tryPickup(player)) {
-                    /*if (!player.isCreative()) {
-                        player.sendPickup(this, 1);
-                    }*/
                     this.discard();
                 }
             }
@@ -351,20 +371,26 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
     public void readCustomDataFromNbt(NbtCompound nbt) {
         super.readCustomDataFromNbt(nbt);
         if (nbt.contains("disc", 10)) {
-            this.cleaverStack = ItemStack.fromNbt(nbt.getCompound("disc"));
+            this.discStack = ItemStack.fromNbt(nbt.getCompound("disc"));
         }
 
         this.dealtDamage = nbt.getBoolean("DealtDamage");
         if (nbt.contains("InGround")) {
             this.setInGround(nbt.getBoolean("InGround"));
+            this.inGround = nbt.getBoolean("InGround");
+        }
+
+        if (nbt.contains("BounceCount")) {
+            this.bounceCount = nbt.getInt("BounceCount");
         }
     }
 
     public void writeCustomDataToNbt(NbtCompound nbt) {
         super.writeCustomDataToNbt(nbt);
-        nbt.put("disc", this.cleaverStack.writeNbt(new NbtCompound()));
+        nbt.put("disc", this.discStack.writeNbt(new NbtCompound()));
         nbt.putBoolean("DealtDamage", this.dealtDamage);
         nbt.putBoolean("InGround", this.isInGroundTracked());
+        nbt.putInt("BounceCount", this.bounceCount);
     }
 
     protected float getDragInWater() {
@@ -375,10 +401,16 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
         if (this.pickupType != PickupPermission.ALLOWED) {
             super.age();
         }
-
     }
 
     public boolean shouldRender(double cameraX, double cameraY, double cameraZ) {
         return true;
+    }
+
+    /**
+     * Placeholder for future return-to-owner steering. Left intentionally empty.
+     */
+    private void attemptReturnToOwner() {
+        // Intentionally blank: physics-first disc does not auto-return.
     }
 }

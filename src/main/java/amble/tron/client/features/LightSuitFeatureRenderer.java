@@ -86,7 +86,7 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
         Vector3f utility = new Vector3f(0.2f, 0.9f, 0.5f);
         Vector3f user = new Vector3f(1f, 1f, 1f);
         Vector3f theoSpecific = new Vector3f(1, 0, 0);
-        Vector3f finalProgram = theoSpecific;
+        Vector3f finalProgram = user;
         if (stack.getItem() instanceof LightSuitItem lightSuitItem) {
             if (finalProgram != lightSuitItem.getRGB(stack)) {
                 lightSuitItem.setRGB(finalProgram, stack);
