@@ -60,9 +60,7 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
     // rotational state
     private static final float SPIN_DAMPING = 0.98f;                 // multiplicative damping per tick (close to 1)
 
-    // TODO: adjust as needed
-    private static final int PHYSICS_SUBSTEPS = 10;
-    private static final float PHYSICS_SUBSTEP_THRESHOLD = 1f;
+    private static final float PHYSICS_SUBSTEP_THRESHOLD = 8f;
 
     private ItemStack discStack;
     private boolean dealtDamage = false;
@@ -176,11 +174,13 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
         if (Math.abs(this.spin) < 0.01f) this.spin = 0.0f;
 
         // 4) Commit velocity and let base class handle movement and collisions
-        if (vel.lengthSquared() >= PHYSICS_SUBSTEP_THRESHOLD) {
-            int steps = PHYSICS_SUBSTEPS;
+        double len = vel.lengthSquared();
+
+        if (len >= PHYSICS_SUBSTEP_THRESHOLD) {
+            int steps = (int) Math.ceil(len - (len % PHYSICS_SUBSTEP_THRESHOLD));
 
             while (steps > 0) {
-                this.setVelocity(vel.multiply(1f / PHYSICS_SUBSTEPS));
+                this.setVelocity(vel.multiply(1f / steps));
                 super.tick();
 
                 steps--;
