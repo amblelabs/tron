@@ -55,7 +55,7 @@ public class IdentityDiscThrownItemRenderer<T extends Entity>
             return;
         }
 
-        boolean bl = !flyingItem.isInGroundTracked();
+        boolean bl = !flyingItem.isInGround();
 
         matrices.push();
         matrices.scale(0.8f, 0.8f, 0.8f);
