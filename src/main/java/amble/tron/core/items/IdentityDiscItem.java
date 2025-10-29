@@ -2,6 +2,7 @@ package amble.tron.core.items;
 
 import amble.tron.Tron;
 import amble.tron.core.TronAttachmentTypes;
+import amble.tron.core.TronAttachmentUtil;
 import amble.tron.core.entities.IdentityDiscThrownEntity;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
@@ -68,9 +69,9 @@ public class IdentityDiscItem extends Item {
         super.inventoryTick(stack, world, entity, slot, selected);
         if (!(world instanceof ServerWorld)) return;
         if (entity instanceof ServerPlayerEntity player && stack.getItem() instanceof IdentityDiscItem) {
-            Vector3f factionColor = TronAttachmentTypes.getFactionColor(player);
+            Vector3f factionColor = TronAttachmentUtil.getFactionColor(player);
             if (this.getRGB(stack) != factionColor) {
-                this.setRGB(player, TronAttachmentTypes.getFactionColor(player), stack);
+                this.setRGB(player, TronAttachmentUtil.getFactionColor(player), stack);
             }
         }
     }

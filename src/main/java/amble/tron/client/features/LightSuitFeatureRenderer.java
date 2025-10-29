@@ -1,6 +1,7 @@
 package amble.tron.client.features;
 
 import amble.tron.core.TronAttachmentTypes;
+import amble.tron.core.TronAttachmentUtil;
 import amble.tron.core.items.LightSuitItem;
 import amble.tron.Tron;
 import amble.tron.core.items.IdentityDiscItem;
@@ -88,7 +89,7 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
         Vector3f user = new Vector3f(1f, 1f, 1f);
         Vector3f theoSpecific = new Vector3f(1, 0, 0);
         Vector3f finalProgram = rectified;
-        Vector3f playerColor = TronAttachmentTypes.getFactionColor(livingEntity);
+        Vector3f playerColor = TronAttachmentUtil.getFactionColor(livingEntity);
         if (stack.getItem() instanceof LightSuitItem lightSuitItem) {
             /*if (finalProgram != lightSuitItem.getRGB(stack)) {
                 lightSuitItem.setRGB(finalProgram, stack);

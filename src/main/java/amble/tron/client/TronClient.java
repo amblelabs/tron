@@ -13,13 +13,13 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
 import org.joml.Vector3f;
 
-import static amble.tron.core.TronAttachmentTypes.ATTACHMENT_UPDATE;
+import static amble.tron.core.TronAttachmentUtil.ATTACHMENT_UPDATE;
 import static amble.tron.core.items.IdentityDiscItem.CHANGE_COLOR;
-import static amble.tron.core.items.IdentityDiscItem.RETRACT_BLADE;
 
 public class TronClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
+        TronAttachmentTypes.init();
         EntityRendererRegistry.register(TronEntities.IDENTITY_DISC, IdentityDiscThrownItemRenderer::new);
         registerClientReceivers();
     }

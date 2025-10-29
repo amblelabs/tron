@@ -1,8 +1,8 @@
 package amble.tron.core.entities;
 
-import amble.tron.core.TronAttachmentTypes;
 import amble.tron.core.TronEntities;
 import amble.tron.core.TronItems;
+import amble.tron.core.items.IdentityDiscItem;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
@@ -18,7 +18,6 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.particle.ItemStackParticleEffect;
 import net.minecraft.particle.ParticleEffect;
 import net.minecraft.particle.ParticleTypes;
-import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.ActionResult;
@@ -71,6 +70,9 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
 
     private int bounceCount = 0;                                    // bounce tracking
     private float spin = 0.0f;                                      // angular speed (arbitrary units)
+    // Return-to-owner state: when true, physics are disabled and the disc lerps to its owner.
+    private boolean returningToOwner = false;
+    private static final double RETURN_SPEED = 0.6; // units per tick (adjust as needed)
 
     public IdentityDiscThrownEntity(EntityType<IdentityDiscThrownEntity> entityType, World world) {
         super(entityType, world);
@@ -113,6 +115,11 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
 
     @Override
     public ItemStack asItemStack() {
+        ItemStack stack = TronItems.IDENTITY_DISC.getDefaultStack();
+        if (stack.getItem() instanceof IdentityDiscItem disc) {
+            disc.setBladeRetracted(stack, false);
+            return stack;
+        }
         return TronItems.IDENTITY_DISC.getDefaultStack();
     }
 
@@ -145,14 +152,69 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
             this.dealtDamage = true;
         }
 
-        // Reduce speed after hitting an entity to simulate energy loss
+        // After hitting an entity: set velocity back toward the owner and attempt to give the disc back.
         Vec3d prevVel = this.getVelocity();
-        this.setVelocity(prevVel.multiply(0.55)); // lose ~45% of speed on impact with entity
+
+        if (owner != null) {
+            Vec3d toOwner = owner.getPos().subtract(this.getPos());
+            double dist = toOwner.length();
+            if (dist > 1e-6) {
+                double speed = Math.max(prevVel.length(), 0.8); // ensure a minimal return speed
+                this.setVelocity(toOwner.normalize().multiply(speed));
+            } else {
+                this.setVelocity(prevVel.multiply(0.55)); // fallback
+            }
+        } else {
+            this.setVelocity(prevVel.multiply(0.55));
+        }
+
+        // If owner is a player, disable physics and start returning to them.
+        if (owner instanceof PlayerEntity player) {
+            // mark pickup allowed so player can still pick it up on contact
+            this.pickupType = PickupPermission.ALLOWED;
+            this.attemptReturnToOwner();
+        }
+
         this.playSound(getHitSound(), 1.0F, 1.0F);
     }
 
     @Override
     public void tick() {
+        // Returning-to-owner behavior: disable normal physics and lerp straight to owner.
+        if (this.returningToOwner) {
+            Entity owner = this.getOwner();
+            if (!(owner instanceof PlayerEntity player) || owner.isRemoved()) {
+                this.returningToOwner = false;
+            } else {
+                Vec3d toPlayer = player.getPos().add(0, player.getEyeHeight(player.getPose()), 0).subtract(this.getPos());
+                double dist = toPlayer.length();
+                if (dist < 1.25) {
+                    // attempt to insert into player's inventory (server-side)
+                    if (!this.getWorld().isClient()) {
+                        boolean inserted = player.getInventory().insertStack(this.asItemStack());
+                        if (inserted) {
+                            this.playSound(getHitSound(), 1.0F, 1.0F);
+                            this.discard();
+                            return;
+                        } else {
+                            // stop returning; allow pickup
+                            this.returningToOwner = false;
+                            this.pickupType = PickupPermission.ALLOWED;
+                        }
+                    }
+                } else {
+                    double step = Math.min(RETURN_SPEED, Math.max(0.1, dist * 0.2));
+                    Vec3d move = toPlayer.normalize().multiply(step);
+                    Vec3d newPos = this.getPos().add(move);
+                    this.setPos(newPos.x, newPos.y, newPos.z);
+                    if (this.getWorld().isClient()) {
+                        this.getWorld().addParticle(getParticleParameters(), newPos.x, newPos.y, newPos.z, 0.0, 0.0, 0.0);
+                    }
+                    return;
+                }
+            }
+        }
+
         if (this.inGround) {
             this.spin *= SPIN_DAMPING;
             if (this.getWorld().isClient() && this.random.nextInt(20) == 0) {
@@ -162,7 +224,7 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
             return;
         }
 
-        Vec3d vel = this.getVelocity().add(GRAVITY_VEC);
+        Vec3d vel = this.getVelocity().add(this.returningToOwner ? new Vec3d(0, 0, 0) : GRAVITY_VEC);
         double dragFactor = Math.max(0.0, 1.0 - LINEAR_DRAG);
         vel = vel.multiply(dragFactor);
 
@@ -390,9 +452,23 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
     }
 
     /**
-     * Placeholder for future return-to-owner steering. Left intentionally empty.
+     * Begin returning to owner: enable return flag, allow pickup and set initial homing velocity.
+     * This sets an initial velocity toward the owner; per-tick steering can be added in `tick()` if finer control is needed.
      */
     private void attemptReturnToOwner() {
-        // Intentionally blank: physics-first disc does not auto-return.
+        Entity owner = this.getOwner();
+        if (owner == null || owner.isRemoved()) return;
+
+        this.returningToOwner = true;
+        this.pickupType = PickupPermission.ALLOWED;
+
+        Vec3d toOwner = owner.getPos().subtract(this.getPos());
+        double dist = toOwner.length();
+        if (dist < 1e-6) {
+            this.setVelocity(Vec3d.ZERO);
+            return;
+        }
+
+        this.setVelocity(toOwner.normalize().multiply(RETURN_SPEED));
     }
 }

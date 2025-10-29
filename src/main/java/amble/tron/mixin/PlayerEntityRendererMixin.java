@@ -1,6 +1,7 @@
 package amble.tron.mixin;
 
 import amble.tron.core.TronAttachmentTypes;
+import amble.tron.core.TronAttachmentUtil;
 import amble.tron.core.items.LightSuitItem;
 import amble.tron.client.features.LightSuitFeatureRenderer;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -55,7 +56,7 @@ public abstract class PlayerEntityRendererMixin
         if (!(stack.getItem() instanceof LightSuitItem lightSuitItem)) return;
         ci.cancel();
 
-        Vector3f suitColor = new Vector3f(TronAttachmentTypes.getFactionColor(player));
+        Vector3f suitColor = new Vector3f(TronAttachmentUtil.getFactionColor(player));
 
         PlayerEntityModel<AbstractClientPlayerEntity> playerEntityModel = this.getModel();
         this.setModelPose(player);

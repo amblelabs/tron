@@ -2,6 +2,7 @@ package amble.tron.core.items;
 
 import amble.tron.Tron;
 import amble.tron.core.TronAttachmentTypes;
+import amble.tron.core.TronAttachmentUtil;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -47,7 +48,7 @@ public class LightSuitItem extends ArmorItem {
             if (world.getBlockState(player.getBlockPos().down()).getBlock() == Blocks.NETHERITE_BLOCK) {
                 Vector3f rectified = new Vector3f(1f, 0.5f, 0.1f);
 
-                TronAttachmentTypes.setFactionColor(player, rectified);
+                TronAttachmentUtil.setFactionColor(player, rectified);
             }
         }
     }

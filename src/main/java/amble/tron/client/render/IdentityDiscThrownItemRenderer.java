@@ -1,6 +1,7 @@
 package amble.tron.client.render;
 
 import amble.tron.core.TronAttachmentTypes;
+import amble.tron.core.TronAttachmentUtil;
 import amble.tron.core.entities.IdentityDiscThrownEntity;
 import amble.tron.core.items.IdentityDiscItem;
 import net.fabricmc.api.EnvType;
@@ -80,7 +81,7 @@ public class IdentityDiscThrownItemRenderer<T extends Entity>
 
         if (!(stack.getItem() instanceof IdentityDiscItem disc)) return;
 
-        disc.__setRGB(TronAttachmentTypes.getFactionColor(player), stack);
+        disc.__setRGB(TronAttachmentUtil.getFactionColor(player), stack);
 
         this.itemRenderer.renderItem(
                 stack,
