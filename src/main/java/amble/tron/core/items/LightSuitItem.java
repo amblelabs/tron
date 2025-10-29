@@ -44,12 +44,10 @@ public class LightSuitItem extends ArmorItem {
     public void inventoryTick(ItemStack stack, World world, Entity entity, int slot, boolean selected) {
         super.inventoryTick(stack, world, entity, slot, selected);
         if (!(world instanceof ServerWorld)) return;
-        if (entity instanceof ServerPlayerEntity player && stack.getItem() instanceof IdentityDiscItem) {
-            if (world.getBlockState(player.getBlockPos().down()).getBlock() == Blocks.NETHERITE_BLOCK) {
-                Vector3f rectified = new Vector3f(1f, 0.5f, 0.1f);
-
-                TronAttachmentUtil.setFactionColor(player, rectified);
-            }
+        if (entity instanceof ServerPlayerEntity player && stack.getItem() instanceof LightSuitItem) {
+            Vector3f color = TronAttachmentUtil.getFactionColor(player);
+            if (this.getRGB(stack) == color) return;
+            this.setRGB(color, stack);
         }
     }
 
