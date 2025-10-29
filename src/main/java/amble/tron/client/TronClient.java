@@ -5,9 +5,11 @@ import amble.tron.client.render.IdentityDiscThrownItemRenderer;
 import amble.tron.core.TronAttachmentTypes;
 import amble.tron.core.TronEntities;
 import amble.tron.core.items.IdentityDiscItem;
+import amble.tron.core.items.LightSuitItem;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
@@ -15,6 +17,7 @@ import org.joml.Vector3f;
 
 import static amble.tron.core.TronAttachmentUtil.ATTACHMENT_UPDATE;
 import static amble.tron.core.items.IdentityDiscItem.CHANGE_COLOR;
+import static amble.tron.core.items.LightSuitItem.CHANGE_COLOR_LIGHTSUIT;
 
 public class TronClient implements ClientModInitializer {
     @Override
@@ -69,5 +72,14 @@ public class TronClient implements ClientModInitializer {
                 }
             });
         });*/
+
+        ClientPlayNetworking.registerGlobalReceiver(CHANGE_COLOR_LIGHTSUIT, (client, handler, buf, responseSender) -> {
+            Vector3f color = buf.readVector3f();
+            ItemStack stack = buf.readItemStack();
+
+            if (stack.getItem() instanceof LightSuitItem lightSuitItem) {
+                lightSuitItem.__setRGB(color, stack);
+            }
+        });
     }
 }

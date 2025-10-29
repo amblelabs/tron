@@ -20,7 +20,7 @@ public class TronAttachmentUtil {
         Vector3f color = new Vector3f(1, 1, 1);
         player.setAttached(TronAttachmentTypes.FACTION_COLOR, color);
         if (player.getServer() != null) {
-            broadcastFactionColor(null, color, player.getServer());
+            broadcastFactionColor(player, null, color, player.getServer());
         } else {
             sendFactionColorUpdate(player, color);
         }
@@ -43,26 +43,40 @@ public class TronAttachmentUtil {
     public static final Identifier ATTACHMENT_UPDATE = Tron.of("attachment_update");
 
     public static void sendFactionColorUpdate(ServerPlayerEntity target, Vector3f color) {
+        int targetId = target.getId();
+
         PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeIdentifier(Tron.of("faction_color")); // which attachment
+        buf.writeIdentifier(TronAttachmentTypes.FACTION_COLOR.identifier()); // which attachment
+        buf.writeInt(targetId);
         buf.writeFloat(color.x());
         buf.writeFloat(color.y());
         buf.writeFloat(color.z());
         ServerPlayNetworking.send(target, ATTACHMENT_UPDATE, buf);
+
         for (ServerPlayerEntity player : PlayerLookup.tracking(target)) {
-            ServerPlayNetworking.send(player, ATTACHMENT_UPDATE, buf);
+            PacketByteBuf buf2 = PacketByteBufs.create();
+            buf2.writeIdentifier(TronAttachmentTypes.FACTION_COLOR.identifier());
+            buf2.writeInt(targetId);
+            buf2.writeFloat(color.x());
+            buf2.writeFloat(color.y());
+            buf2.writeFloat(color.z());
+            ServerPlayNetworking.send(player, ATTACHMENT_UPDATE, buf2);
         }
     }
 
     // Broadcast example (only when needed — prefer tracking players instead of everyone)
-    public static void broadcastFactionColor(ServerPlayerEntity except, Vector3f color, MinecraftServer server) {
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeIdentifier(Tron.of("faction_color"));
-        buf.writeFloat(color.x());
-        buf.writeFloat(color.y());
-        buf.writeFloat(color.z());
+    public static void broadcastFactionColor(ServerPlayerEntity subject, ServerPlayerEntity except, Vector3f color, MinecraftServer server) {
+        int subjectId = subject.getId();
         for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
-            if (p != except) ServerPlayNetworking.send(p, ATTACHMENT_UPDATE, buf);
+            if (p != except) {
+                PacketByteBuf buf = PacketByteBufs.create();
+                buf.writeIdentifier(TronAttachmentTypes.FACTION_COLOR.identifier());
+                buf.writeInt(subjectId);
+                buf.writeFloat(color.x());
+                buf.writeFloat(color.y());
+                buf.writeFloat(color.z());
+                ServerPlayNetworking.send(p, ATTACHMENT_UPDATE, buf);
+            }
         }
     }
 

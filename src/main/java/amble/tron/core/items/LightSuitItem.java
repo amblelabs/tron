@@ -25,17 +25,6 @@ public class LightSuitItem extends ArmorItem {
     private static final String green = "Y";
     private static final String blue = "Z";
 
-    static  {
-        ServerPlayNetworking.registerGlobalReceiver(CHANGE_COLOR_LIGHTSUIT, (server, player, handler, buf, responseSender) -> {
-            Vector3f color = buf.readVector3f();
-            ItemStack stack = buf.readItemStack();
-
-            if (stack.getItem() instanceof LightSuitItem lightSuitItem) {
-                lightSuitItem.__setRGB(color, stack);
-            }
-        });
-    }
-
     public LightSuitItem(ArmorMaterial material, Type type, Settings settings) {
         super(material, type, settings);
     }
@@ -47,7 +36,7 @@ public class LightSuitItem extends ArmorItem {
         if (entity instanceof ServerPlayerEntity player && stack.getItem() instanceof LightSuitItem) {
             Vector3f color = TronAttachmentUtil.getFactionColor(player);
             if (this.getRGB(stack) == color) return;
-            this.setRGB(color, stack);
+            this.setRGB(player, color, stack);
         }
     }
 
@@ -70,7 +59,7 @@ public class LightSuitItem extends ArmorItem {
         return new Vector3f(1, 1, 1);
     }
 
-    public void setRGB(Vector3f vector3f, ItemStack stack) {
+    public void setRGB(ServerPlayerEntity player, Vector3f vector3f, ItemStack stack) {
         NbtCompound nbt = stack.getOrCreateNbt();
         nbt.putFloat(red, vector3f.x);
         nbt.putFloat(green, vector3f.y);
@@ -79,10 +68,10 @@ public class LightSuitItem extends ArmorItem {
         PacketByteBuf buf = PacketByteBufs.create();
         buf.writeVector3f(vector3f);
         buf.writeItemStack(stack);
-        ClientPlayNetworking.send(LightSuitItem.CHANGE_COLOR_LIGHTSUIT, buf);
+        ServerPlayNetworking.send(player, LightSuitItem.CHANGE_COLOR_LIGHTSUIT, buf);
     }
 
-    protected void __setRGB(Vector3f vector3f, ItemStack stack) {
+    public void __setRGB(Vector3f vector3f, ItemStack stack) {
         if ((stack.getItem() instanceof LightSuitItem)) return;
         NbtCompound nbt = stack.getOrCreateNbt();
         nbt.putFloat(red, vector3f.x);

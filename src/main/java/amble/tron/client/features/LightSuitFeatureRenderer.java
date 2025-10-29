@@ -89,15 +89,12 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
         Vector3f user = new Vector3f(1f, 1f, 1f);
         Vector3f theoSpecific = new Vector3f(1, 0, 0);
         Vector3f finalProgram = rectified;
-        Vector3f playerColor = TronAttachmentUtil.getFactionColor(livingEntity);
         if (stack.getItem() instanceof LightSuitItem lightSuitItem) {
             /*if (finalProgram != lightSuitItem.getRGB(stack)) {
                 lightSuitItem.setRGB(finalProgram, stack);
             }*/
-            /*this.model.render(matrixStack, vertexConsumerProvider.getBuffer(RenderLayer.getEyes(LIGHTSUIT_LIGHTS)), i, OverlayTexture.DEFAULT_UV,
-                    lightSuitItem.getRGB(stack).x, lightSuitItem.getRGB(stack).y, lightSuitItem.getRGB(stack).z, 1f);*/
             this.model.render(matrixStack, vertexConsumerProvider.getBuffer(RenderLayer.getEyes(LIGHTSUIT_LIGHTS)), i, OverlayTexture.DEFAULT_UV,
-                    playerColor.x, playerColor.y, playerColor.z, 1f);
+                    lightSuitItem.getRGB(stack).x, lightSuitItem.getRGB(stack).y, lightSuitItem.getRGB(stack).z, 1f);
         }
 
         matrixStack.pop();
