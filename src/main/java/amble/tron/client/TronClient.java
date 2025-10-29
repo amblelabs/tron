@@ -2,8 +2,10 @@ package amble.tron.client;
 
 import amble.tron.Tron;
 import amble.tron.client.render.IdentityDiscThrownItemRenderer;
+import amble.tron.client.render.LightCycleEntityRenderer;
 import amble.tron.core.TronAttachmentTypes;
 import amble.tron.core.TronEntities;
+import amble.tron.core.entities.LightCycleEntity;
 import amble.tron.core.items.IdentityDiscItem;
 import amble.tron.core.items.LightSuitItem;
 import net.fabricmc.api.ClientModInitializer;
@@ -24,6 +26,7 @@ public class TronClient implements ClientModInitializer {
     public void onInitializeClient() {
         TronAttachmentTypes.init();
         EntityRendererRegistry.register(TronEntities.IDENTITY_DISC, IdentityDiscThrownItemRenderer::new);
+        EntityRendererRegistry.register(TronEntities.LIGHT_CYCLE, LightCycleEntityRenderer::new);
         registerClientReceivers();
     }
 
