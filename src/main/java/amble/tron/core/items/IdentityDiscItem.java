@@ -115,6 +115,7 @@ public class IdentityDiscItem extends Item {
             IdentityDiscThrownEntity discThrownEntity = new IdentityDiscThrownEntity(world, user, itemStack);
             float yawOffset = user.getYaw();
             discThrownEntity.setVelocity(user, user.getPitch(), yawOffset, 0.0F, 4f, 0f);
+            discThrownEntity.setColor(this.getRGB(itemStack));
             world.spawnEntity(discThrownEntity);
             world.playSound(null, user.getX(), user.getY(), user.getZ(), this.getDefaultSound(), SoundCategory.NEUTRAL, 0.5F, 1F / (world.getRandom().nextFloat() * 0.4F + 0.8F));
         }
