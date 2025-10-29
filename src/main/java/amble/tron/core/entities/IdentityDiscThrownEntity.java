@@ -73,6 +73,7 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
     // Return-to-owner state: when true, physics are disabled and the disc lerps to its owner.
     private boolean returningToOwner = false;
     private static final double RETURN_SPEED = 0.6; // units per tick (adjust as needed)
+    private static final double MAX_RETURN_DISTANCE = 40.0; // blocks
 
     public IdentityDiscThrownEntity(EntityType<IdentityDiscThrownEntity> entityType, World world) {
         super(entityType, world);
@@ -133,7 +134,7 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
     @Override
     protected void onEntityHit(EntityHitResult entityHitResult) {
         Entity target = entityHitResult.getEntity();
-        if (target == this.getOwner()) return;
+        if (target == this.getOwner() || target instanceof IdentityDiscThrownEntity) return;
 
         Entity owner = this.getOwner();
         DamageSource damageSource = this.getDamageSources().thrown(this, owner == null ? this : owner);
@@ -178,11 +179,18 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
         this.playSound(getHitSound(), 1.0F, 1.0F);
     }
 
-    @Override
     public void tick() {
+        // If disc is too far from owner, trigger return
+        Entity owner = this.getOwner();
+        if (!this.returningToOwner && owner instanceof PlayerEntity) {
+            double distToOwner = this.getPos().distanceTo(owner.getPos());
+            if (distToOwner > MAX_RETURN_DISTANCE) {
+                this.attemptReturnToOwner();
+            }
+        }
+
         // Returning-to-owner behavior: disable normal physics and lerp straight to owner.
         if (this.returningToOwner) {
-            Entity owner = this.getOwner();
             if (!(owner instanceof PlayerEntity player) || owner.isRemoved()) {
                 this.returningToOwner = false;
             } else {

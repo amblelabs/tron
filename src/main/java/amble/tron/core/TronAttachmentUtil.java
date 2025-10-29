@@ -2,6 +2,7 @@ package amble.tron.core;
 
 import amble.tron.Tron;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.network.PacketByteBuf;
@@ -48,6 +49,9 @@ public class TronAttachmentUtil {
         buf.writeFloat(color.y());
         buf.writeFloat(color.z());
         ServerPlayNetworking.send(target, ATTACHMENT_UPDATE, buf);
+        for (ServerPlayerEntity player : PlayerLookup.tracking(target)) {
+            ServerPlayNetworking.send(player, ATTACHMENT_UPDATE, buf);
+        }
     }
 
     // Broadcast example (only when needed — prefer tracking players instead of everyone)

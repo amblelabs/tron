@@ -116,17 +116,14 @@ public class IdentityDiscItem extends Item {
             float yawOffset = user.getYaw();
             discThrownEntity.setVelocity(user, user.getPitch(), yawOffset, 0.0F, 4f, 0f);
             world.spawnEntity(discThrownEntity);
-            //discThrownEntity.setColor(this.getRGB(itemStack));
             world.playSound(null, user.getX(), user.getY(), user.getZ(), this.getDefaultSound(), SoundCategory.NEUTRAL, 0.5F, 1F / (world.getRandom().nextFloat() * 0.4F + 0.8F));
         }
 
         user.incrementStat(Stats.USED.getOrCreateStat(this));
-        if (!user.getAbilities().creativeMode) {
-            itemStack.decrement(1);
-        }
+        itemStack.decrement(1);
 
         ItemCooldownManager cooldownManager = user.getItemCooldownManager();
-        //cooldownManager.set(this, 40);
+        cooldownManager.set(this, 40);
 
         return TypedActionResult.success(itemStack, world.isClient());
     }

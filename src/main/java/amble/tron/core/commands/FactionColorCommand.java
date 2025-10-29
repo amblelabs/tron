@@ -16,9 +16,8 @@ import org.joml.Vector3f;
 
 public class FactionColorCommand {
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
-        dispatcher.register(CommandManager.literal("tron")
+        dispatcher.register(CommandManager.literal("tron factioncolor")
                 .requires(source -> source.hasPermissionLevel(2))
-                .then(CommandManager.literal("factioncolor"))
                 .then(CommandManager.argument("red", FloatArgumentType.floatArg())
                         .then(CommandManager.argument("green", FloatArgumentType.floatArg())
                                 .then(CommandManager.argument("blue", FloatArgumentType.floatArg())
