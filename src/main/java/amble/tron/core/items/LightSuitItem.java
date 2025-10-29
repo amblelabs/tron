@@ -1,15 +1,21 @@
 package amble.tron.core.items;
 
 import amble.tron.Tron;
+import amble.tron.core.TronAttachmentTypes;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.block.Blocks;
+import net.minecraft.entity.Entity;
 import net.minecraft.item.ArmorItem;
 import net.minecraft.item.ArmorMaterial;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.PacketByteBuf;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
+import net.minecraft.world.World;
 import org.joml.Vector3f;
 
 public class LightSuitItem extends ArmorItem {
@@ -31,6 +37,19 @@ public class LightSuitItem extends ArmorItem {
 
     public LightSuitItem(ArmorMaterial material, Type type, Settings settings) {
         super(material, type, settings);
+    }
+
+    @Override
+    public void inventoryTick(ItemStack stack, World world, Entity entity, int slot, boolean selected) {
+        super.inventoryTick(stack, world, entity, slot, selected);
+        if (!(world instanceof ServerWorld)) return;
+        if (entity instanceof ServerPlayerEntity player && stack.getItem() instanceof IdentityDiscItem) {
+            if (world.getBlockState(player.getBlockPos().down()).getBlock() == Blocks.NETHERITE_BLOCK) {
+                Vector3f rectified = new Vector3f(1f, 0.5f, 0.1f);
+
+                TronAttachmentTypes.setFactionColor(player, rectified);
+            }
+        }
     }
 
     @Override

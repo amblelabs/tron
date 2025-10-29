@@ -1,6 +1,5 @@
 package amble.tron.core.entities;
 
-import amble.tron.core.TronAttachmentTypes;
 import amble.tron.core.TronEntities;
 import amble.tron.core.TronItems;
 import net.minecraft.enchantment.EnchantmentHelper;
@@ -18,17 +17,14 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.particle.ItemStackParticleEffect;
 import net.minecraft.particle.ParticleEffect;
 import net.minecraft.particle.ParticleTypes;
-import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
 import org.joml.Vector3f;
 
@@ -47,19 +43,19 @@ import java.util.List;
  * - Disc settles when surface contact or kinetic energy falls below a small threshold.
  * - Spin is independent and damped multiplicatively per tick.
  */
-public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
+public class IdentityDiscThrownEntityOld extends PersistentProjectileEntity {
 
-    private static final TrackedData<Vector3f> COLOR = DataTracker.registerData(IdentityDiscThrownEntity.class, TrackedDataHandlerRegistry.VECTOR3F);
+    private static final TrackedData<Vector3f> COLOR = DataTracker.registerData(IdentityDiscThrownEntityOld.class, TrackedDataHandlerRegistry.VECTOR3F);
 
     // PHYSICS PARAMETERS (tweak as needed)
-    private static final double gravity = -0.02;              // acceleration (units / tick^2) downward
+    private static final double gravity = -0.04;              // acceleration (units / tick^2) downward
     private static final Vec3d GRAVITY_VEC = new Vec3d(0, gravity, 0);
 
-    private static final double LINEAR_DRAG = 0.02;            // fraction removed per tick (0..1) OV: 0.02;
-    private static final double RESTITUTION = 0.45;           // bounciness (0..1) OV: 0.45;
-    private static final double TANGENTIAL_DAMPING = 0.20;     // fraction of tangential velocity removed on contact (0..1) OV: 0.60;
-    private static final double SETTLE_SPEED_THRESHOLD = 0.01;  // speed below which entity will settle OV: 0.01;
-    private static final int MAX_BOUNCES_BEFORE_SETTLE = 6;      // safety cap to stop prolonged bouncing OV: 6;
+    private static final double LINEAR_DRAG = 0.02;            // fraction removed per tick (0..1)
+    private static final double RESTITUTION = 0.45;           // bounciness (0..1)
+    private static final double TANGENTIAL_DAMPING = 0.60;     // fraction of tangential velocity removed on contact (0..1)
+    private static final double SETTLE_SPEED_THRESHOLD = 0.01;  // speed below which entity will settle
+    private static final int MAX_BOUNCES_BEFORE_SETTLE = 6;      // safety cap to stop prolonged bouncing
 
     // rotational state
     private static final float SPIN_DAMPING = 0.98f;                 // multiplicative damping per tick (close to 1)
@@ -72,12 +68,12 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
     private int bounceCount = 0;                                    // bounce tracking
     private float spin = 0.0f;                                      // angular speed (arbitrary units)
 
-    public IdentityDiscThrownEntity(EntityType<IdentityDiscThrownEntity> entityType, World world) {
+    public IdentityDiscThrownEntityOld(EntityType<IdentityDiscThrownEntityOld> entityType, World world) {
         super(entityType, world);
         this.discStack = new ItemStack(TronItems.IDENTITY_DISC);
     }
 
-    public IdentityDiscThrownEntity(World world, PlayerEntity player, ItemStack itemStack) {
+    public IdentityDiscThrownEntityOld(World world, PlayerEntity player, ItemStack itemStack) {
         super(TronEntities.IDENTITY_DISC, player, world);
         this.discStack = itemStack;
         this.spin = 20.0f + this.random.nextFloat() * 40.0f;
@@ -153,77 +149,67 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
 
     @Override
     public void tick() {
+        // If settled, keep minimal behavior and allow pickup
         if (this.inGround) {
             this.spin *= SPIN_DAMPING;
-            if (this.getWorld().isClient() && this.random.nextInt(20) == 0) {
-                this.getWorld().addParticle(ParticleTypes.CRIT, this.getX(), this.getY() + 0.1, this.getZ(), 0.0, 0.0, 0.0);
+            if (this.getWorld().isClient && this.random.nextInt(20) == 0) {
+                this.getWorld().addParticle(ParticleTypes.CRIT, this.getX(), this.getY() + 0.1, this.getZ(),
+                        0.0, 0.0, 0.0);
             }
             super.tick();
             return;
         }
 
-        Vec3d vel = this.getVelocity().add(GRAVITY_VEC);
-        double dragFactor = Math.max(0.0, 1.0 - LINEAR_DRAG);
+        // --- PHYSICS INTEGRATION: Semi-implicit Euler (symplectic) ---
+        // 1) Apply accelerations to velocity (gravity)
+        Vec3d vel = this.getVelocity();
+        vel = vel.add(GRAVITY_VEC); // dt = 1 tick
+
+        // 2) Apply linear drag (simple multiplicative damping)
+        double dragFactor = Math.max(0.0, 1.0 - LINEAR_DRAG); // clamp to prevent negative
         vel = vel.multiply(dragFactor);
 
+        // 3) Update spin (purely visual/rotational, not affecting translation)
         this.spin *= SPIN_DAMPING;
         if (Math.abs(this.spin) < 0.01f) this.spin = 0.0f;
 
-        double speedSq = vel.lengthSquared();
-        double speed = Math.sqrt(speedSq);
+        // 4) Commit velocity and let base class handle movement and collisions
+        double len = vel.lengthSquared();
 
-        int steps = 1;
-        if (speed > PHYSICS_SUBSTEP_THRESHOLD) {
-            steps = (int) Math.ceil(speed / PHYSICS_SUBSTEP_THRESHOLD);
-            steps = Math.max(1, Math.min(steps, 32)); // increased cap to reduce tunneling at high speed
-        }
+        if (len >= PHYSICS_SUBSTEP_THRESHOLD) {
+            int steps = (int) Math.ceil(len - (len % PHYSICS_SUBSTEP_THRESHOLD));
 
-        // Use a conservative substep raycast to detect block collisions along the short motion segment.
-        Vec3d remainingVel = vel;
-        for (int i = 0; i < steps; i++) {
-            // Divide the remaining velocity evenly across remaining substeps to avoid bias.
-            Vec3d perStep = remainingVel.multiply(1.0 / (steps - i));
-            Vec3d start = this.getPos();
-            Vec3d end = start.add(perStep);
-
-            HitResult ray = this.getWorld().raycast(new RaycastContext(start, end,
-                    RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, this));
-
-            if (ray.getType() == HitResult.Type.BLOCK) {
-                BlockHitResult bhr = (BlockHitResult) ray;
-                // Move to the hit location, set incoming per-step velocity and handle bounce.
-                Vec3d hitPos = bhr.getPos();
-                this.setPos(hitPos.x, hitPos.y, hitPos.z);
-                this.setVelocity(perStep);
-                this.onBlockHit(bhr);
-
-                if (this.isRemoved() || this.inGround) return;
-
-                // Update remaining velocity after bounce and continue substeps.
-                remainingVel = this.getVelocity();
-                continue;
-            } else {
-                // No block hit: advance normally for this substep.
-                this.setVelocity(perStep);
+            while (steps > 0) {
+                this.setVelocity(vel.multiply(1f / steps));
                 super.tick();
-                if (this.isRemoved()) return;
+
+                steps--;
             }
+        } else {
+            this.setVelocity(vel);
+            super.tick();
         }
 
+        // After movement/collision callbacks, evaluate settling conditions:
         Vec3d postVel = this.getVelocity();
+        double speedSq = postVel.lengthSquared();
 
-        if (this.isOnGround() || postVel.lengthSquared() < SETTLE_SPEED_THRESHOLD * SETTLE_SPEED_THRESHOLD) {
+        // If on ground or very slow, settle and zero velocity
+        if (this.isOnGround() || speedSq < SETTLE_SPEED_THRESHOLD * SETTLE_SPEED_THRESHOLD) {
             this.inGround = true;
             this.setVelocity(Vec3d.ZERO);
             this.spin = 0.0f;
             return;
         }
 
+        // spawn particles client-side while flying
         if (this.getWorld().isClient()) {
             Vec3d pos = this.getPos();
             this.getWorld().addParticle(getParticleParameters(), pos.x, pos.y, pos.z,
                     postVel.x * 0.1, postVel.y * 0.1, postVel.z * 0.1);
         }
+
+        // Note: return-to-owner is intentionally disabled; placeholder left for future use.
     }
 
     @Override
@@ -247,9 +233,7 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
     }
 
     @Override
-    public void onPlayerCollision(PlayerEntity player) {
-        super.onPlayerCollision(player);
-    }
+    public void onPlayerCollision(PlayerEntity player) { }
 
     /**
      * Consistent bounce handling:
@@ -282,7 +266,7 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
         if (side.getAxis() == Direction.Axis.Y) {
             if (side == Direction.DOWN) {
                 // floor bounce: allow bounce (don't discard) and keep it slightly bouncier
-                restitutionLocal = Math.min(1.0, RESTITUTION * 1.1);
+                restitutionLocal = Math.min(1.0, RESTITUTION * 1.2);
                 tangentialFactor = 0.85;
             } else {
                 // ceiling
@@ -291,7 +275,7 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
             }
         } else {
             // walls: be bouncier and preserve tangential speed
-            restitutionLocal = Math.min(1.0, RESTITUTION * 1.1);
+            restitutionLocal = Math.min(1.0, RESTITUTION * 1.35);
             tangentialFactor = 0.9;
         }
 
@@ -309,13 +293,6 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
         // Apply tangential damping (friction) and global damping
         Vec3d newTangential = tangential.multiply(tangentialFactor);
         Vec3d after = newNormalComp.add(newTangential).multiply(globalDamping);
-
-        // Nudge entity out of the collision point to avoid corner phasing:
-        // move the entity slightly along the collision normal from the reported hit position.
-        final double NUDGE_EPS = 0.015;
-        Vec3d hitPos = blockHitResult.getPos();
-        Vec3d nudgePos = hitPos.add(normal.multiply(NUDGE_EPS));
-        this.setPos(nudgePos.x, nudgePos.y, nudgePos.z);
 
         // If speed is below threshold or too many bounces, settle
         if (after.lengthSquared() < SETTLE_SPEED_THRESHOLD * SETTLE_SPEED_THRESHOLD || this.bounceCount > MAX_BOUNCES_BEFORE_SETTLE) {

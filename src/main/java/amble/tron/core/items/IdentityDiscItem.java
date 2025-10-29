@@ -1,10 +1,13 @@
 package amble.tron.core.items;
 
 import amble.tron.Tron;
+import amble.tron.core.TronAttachmentTypes;
 import amble.tron.core.entities.IdentityDiscThrownEntity;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.block.Blocks;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.ItemCooldownManager;
 import net.minecraft.entity.player.PlayerEntity;
@@ -13,6 +16,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.PacketByteBuf;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
@@ -32,15 +37,6 @@ public class IdentityDiscItem extends Item {
     private static final String bladeRetracted = "bladeRetracted";
 
     static  {
-        ServerPlayNetworking.registerGlobalReceiver(CHANGE_COLOR, (server, player, handler, buf, responseSender) -> {
-            Vector3f color = buf.readVector3f();
-            ItemStack stack = player.getMainHandStack();
-
-            if (stack.getItem() instanceof IdentityDiscItem discItem) {
-                discItem.__setRGB(color, stack);
-                player.getInventory().markDirty();
-            }
-        });
         ServerPlayNetworking.registerGlobalReceiver(RETRACT_BLADE, (server, player, handler, buf, responseSender) -> {
             boolean retract = buf.readBoolean();
             ItemStack stack = player.getMainHandStack();
@@ -65,6 +61,18 @@ public class IdentityDiscItem extends Item {
         compound.putFloat(blue, 1);
         compound.putBoolean(bladeRetracted, true);
         return stack;
+    }
+
+    @Override
+    public void inventoryTick(ItemStack stack, World world, Entity entity, int slot, boolean selected) {
+        super.inventoryTick(stack, world, entity, slot, selected);
+        if (!(world instanceof ServerWorld)) return;
+        if (entity instanceof ServerPlayerEntity player && stack.getItem() instanceof IdentityDiscItem) {
+            Vector3f factionColor = TronAttachmentTypes.getFactionColor(player);
+            if (this.getRGB(stack) != factionColor) {
+                this.setRGB(player, TronAttachmentTypes.getFactionColor(player), stack);
+            }
+        }
     }
 
     public boolean isBladeRetracted(ItemStack stack) {
@@ -101,12 +109,13 @@ public class IdentityDiscItem extends Item {
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
         ItemStack itemStack = user.getStackInHand(hand);
         if (!(itemStack.getItem() instanceof IdentityDiscItem)) return TypedActionResult.fail(itemStack);
+        if (isBladeRetracted(itemStack)) return TypedActionResult.fail(itemStack);
         if (!world.isClient()) {
-            if (isBladeRetracted(itemStack)) return TypedActionResult.fail(itemStack);
             IdentityDiscThrownEntity discThrownEntity = new IdentityDiscThrownEntity(world, user, itemStack);
             float yawOffset = user.getYaw();
-            discThrownEntity.setVelocity(user, user.getPitch(), yawOffset, 0.0F, 4F, 0.1f);
+            discThrownEntity.setVelocity(user, user.getPitch(), yawOffset, 0.0F, 4f, 0f);
             world.spawnEntity(discThrownEntity);
+            //discThrownEntity.setColor(this.getRGB(itemStack));
             world.playSound(null, user.getX(), user.getY(), user.getZ(), this.getDefaultSound(), SoundCategory.NEUTRAL, 0.5F, 1F / (world.getRandom().nextFloat() * 0.4F + 0.8F));
         }
 
@@ -129,15 +138,15 @@ public class IdentityDiscItem extends Item {
         return SoundEvents.ITEM_TRIDENT_THROW;
     }
 
-    public void setRGB(Vector3f vector3f, ItemStack stack) {
+    public void setRGB(ServerPlayerEntity player, Vector3f vector3f, ItemStack stack) {
         __setRGB(vector3f, stack);
 
         PacketByteBuf buf = PacketByteBufs.create();
         buf.writeVector3f(vector3f);
-        ClientPlayNetworking.send(IdentityDiscItem.CHANGE_COLOR, buf);
+        ServerPlayNetworking.send(player, IdentityDiscItem.CHANGE_COLOR, buf);
     }
 
-    protected void __setRGB(Vector3f vector3f, ItemStack stack) {
+    public void __setRGB(Vector3f vector3f, ItemStack stack) {
         if (!(stack.getItem() instanceof IdentityDiscItem)) return;
         NbtCompound nbt = stack.getOrCreateNbt();
         nbt.putFloat(red, vector3f.x);

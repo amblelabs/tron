@@ -1,5 +1,6 @@
 package amble.tron.client.features;
 
+import amble.tron.core.TronAttachmentTypes;
 import amble.tron.core.items.LightSuitItem;
 import amble.tron.Tron;
 import amble.tron.core.items.IdentityDiscItem;
@@ -86,13 +87,16 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
         Vector3f utility = new Vector3f(0.2f, 0.9f, 0.5f);
         Vector3f user = new Vector3f(1f, 1f, 1f);
         Vector3f theoSpecific = new Vector3f(1, 0, 0);
-        Vector3f finalProgram = user;
+        Vector3f finalProgram = rectified;
+        Vector3f playerColor = TronAttachmentTypes.getFactionColor(livingEntity);
         if (stack.getItem() instanceof LightSuitItem lightSuitItem) {
-            if (finalProgram != lightSuitItem.getRGB(stack)) {
+            /*if (finalProgram != lightSuitItem.getRGB(stack)) {
                 lightSuitItem.setRGB(finalProgram, stack);
-            }
+            }*/
+            /*this.model.render(matrixStack, vertexConsumerProvider.getBuffer(RenderLayer.getEyes(LIGHTSUIT_LIGHTS)), i, OverlayTexture.DEFAULT_UV,
+                    lightSuitItem.getRGB(stack).x, lightSuitItem.getRGB(stack).y, lightSuitItem.getRGB(stack).z, 1f);*/
             this.model.render(matrixStack, vertexConsumerProvider.getBuffer(RenderLayer.getEyes(LIGHTSUIT_LIGHTS)), i, OverlayTexture.DEFAULT_UV,
-                    lightSuitItem.getRGB(stack).x, lightSuitItem.getRGB(stack).y, lightSuitItem.getRGB(stack).z, 1f);
+                    playerColor.x, playerColor.y, playerColor.z, 1f);
         }
 
         matrixStack.pop();
@@ -105,9 +109,9 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
         matrixStack.multiply(RotationAxis.NEGATIVE_Z.rotationDegrees(90));
         ItemStack disc = livingEntity.getInventory().getStack(0);
         if (disc.getItem() instanceof IdentityDiscItem discItem && disc != livingEntity.getMainHandStack() && !livingEntity.getItemCooldownManager().isCoolingDown(disc.getItem())) {
-            if (finalProgram != discItem.getRGB(disc)) {
+            /*if (finalProgram != discItem.getRGB(disc)) {
                 discItem.setRGB(finalProgram, disc);
-            }
+            }*/
             MinecraftClient.getInstance().getItemRenderer().renderItem(livingEntity, disc, ModelTransformationMode.FIXED,
                     false, matrixStack, vertexConsumerProvider, null, i, OverlayTexture.DEFAULT_UV, 0);
         }

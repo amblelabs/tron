@@ -1,9 +1,11 @@
 package amble.tron.mixin;
 
+import amble.tron.core.TronAttachmentTypes;
 import amble.tron.core.items.LightSuitItem;
 import amble.tron.client.features.LightSuitFeatureRenderer;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.item.ItemStack;
+import org.joml.Vector3f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -53,6 +55,8 @@ public abstract class PlayerEntityRendererMixin
         if (!(stack.getItem() instanceof LightSuitItem lightSuitItem)) return;
         ci.cancel();
 
+        Vector3f suitColor = new Vector3f(TronAttachmentTypes.getFactionColor(player));
+
         PlayerEntityModel<AbstractClientPlayerEntity> playerEntityModel = this.getModel();
         this.setModelPose(player);
         playerEntityModel.handSwingProgress = 0.0f;
@@ -66,11 +70,11 @@ public abstract class PlayerEntityRendererMixin
         if (rightHanded) {
             this.getModel().rightArm.copyTransform(arm);
             this.getModel().rightArm.render(matrices, vertexConsumers.getBuffer(RenderLayer.getEntityTranslucent(LIGHTSUIT_TEXTURE)), light, OverlayTexture.DEFAULT_UV);
-            this.getModel().rightArm.render(matrices, vertexConsumers.getBuffer(RenderLayer.getEntityCutoutNoCullZOffset(LIGHTSUIT_LIGHTS)), 0xf000f0, OverlayTexture.DEFAULT_UV, lightSuitItem.getRGB(stack).x, lightSuitItem.getRGB(stack).y, lightSuitItem.getRGB(stack).z, 1);
+            this.getModel().rightArm.render(matrices, vertexConsumers.getBuffer(RenderLayer.getEntityCutoutNoCullZOffset(LIGHTSUIT_LIGHTS)), 0xf000f0, OverlayTexture.DEFAULT_UV, suitColor.x, suitColor.y, suitColor.z, 1);
         } else {
             this.getModel().leftArm.copyTransform(arm);
             this.getModel().leftArm.render(matrices, vertexConsumers.getBuffer(RenderLayer.getEntityTranslucent(LIGHTSUIT_TEXTURE)), light, OverlayTexture.DEFAULT_UV);
-            this.getModel().leftArm.render(matrices, vertexConsumers.getBuffer(RenderLayer.getEntityCutoutNoCullZOffset(LIGHTSUIT_LIGHTS)), 0xf000f0, OverlayTexture.DEFAULT_UV, lightSuitItem.getRGB(stack).x, lightSuitItem.getRGB(stack).y, lightSuitItem.getRGB(stack).z, 1);
+            this.getModel().leftArm.render(matrices, vertexConsumers.getBuffer(RenderLayer.getEntityCutoutNoCullZOffset(LIGHTSUIT_LIGHTS)), 0xf000f0, OverlayTexture.DEFAULT_UV, suitColor.x, suitColor.y, suitColor.z, 1);
         }
     }
 }

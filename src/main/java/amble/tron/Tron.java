@@ -1,14 +1,20 @@
 package amble.tron;
 
 import amble.tron.core.Keybindings;
+import amble.tron.core.TronAttachmentTypes;
 import amble.tron.core.TronEntities;
 import amble.tron.core.TronItems;
 import dev.amble.lib.container.RegistryContainer;
 import net.fabricmc.api.ModInitializer;
 
+import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Map;
 
 public class Tron implements ModInitializer {
 	public static final String MOD_ID = "tron";
@@ -24,5 +30,16 @@ public class Tron implements ModInitializer {
         RegistryContainer.register(TronItems.class, MOD_ID);
         RegistryContainer.register(TronEntities.class, MOD_ID);
         Keybindings.init();
+        TronAttachmentTypes.init();
+
+        // Set initial faction color on join
+        registerPlayerFactionColor();
 	}
+
+    private void registerPlayerFactionColor() {
+        ServerPlayConnectionEvents.JOIN.register((serverPlayNetworkHandler, packetSender, server) -> {
+            ServerPlayerEntity player = serverPlayNetworkHandler.getPlayer();
+            TronAttachmentTypes.setInitialPlayerFaction(player);
+        });
+    }
 }

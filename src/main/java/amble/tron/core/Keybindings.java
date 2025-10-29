@@ -8,6 +8,7 @@ import amble.tron.core.items.IdentityDiscItem;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.item.ItemStack;
 import net.minecraft.sound.SoundEvents;
+import net.minecraft.util.Hand;
 import org.lwjgl.glfw.GLFW;
 
 import net.minecraft.client.network.ClientPlayerEntity;
@@ -28,7 +29,7 @@ public class Keybindings {
             if (player == null)
                 return;
 
-            ItemStack stack = player.getMainHandStack();
+            ItemStack stack = player.getActiveHand() == Hand.MAIN_HAND ? player.getMainHandStack() : player.getOffHandStack();
 
             if (stack.getItem() instanceof IdentityDiscItem discItem) {
                 discItem.setBladeRetracted(stack, !discItem.isBladeRetracted(stack));

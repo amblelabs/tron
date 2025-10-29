@@ -1,5 +1,6 @@
 package amble.tron.client.render;
 
+import amble.tron.core.TronAttachmentTypes;
 import amble.tron.core.entities.IdentityDiscThrownEntity;
 import amble.tron.core.items.IdentityDiscItem;
 import net.fabricmc.api.EnvType;
@@ -14,6 +15,7 @@ import net.minecraft.client.render.model.json.ModelTransformationMode;
 import net.minecraft.client.texture.SpriteAtlasTexture;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
@@ -54,9 +56,14 @@ public class IdentityDiscThrownItemRenderer<T extends Entity>
             return;
         }
 
+        if (!(flyingItem.getOwner() instanceof PlayerEntity player)) {
+            return;
+        }
+
         boolean bl = !flyingItem.isInGround();
 
         matrices.push();
+        matrices.translate(0, 0.25f, 0);
         matrices.scale(0.8f, 0.8f, 0.8f);
         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(180 + entity.getYaw()));
         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(entity.getPitch()));
@@ -71,9 +78,9 @@ public class IdentityDiscThrownItemRenderer<T extends Entity>
 
         ItemStack stack = flyingItem.asItemStack();
 
-        if (!(stack.getItem() instanceof IdentityDiscItem identityDiscItem)) return;
-        identityDiscItem.setRGB(identityDiscItem.getRGB(stack), stack);
-        identityDiscItem.setBladeRetracted(stack, false);
+        if (!(stack.getItem() instanceof IdentityDiscItem disc)) return;
+
+        disc.__setRGB(TronAttachmentTypes.getFactionColor(player), stack);
 
         this.itemRenderer.renderItem(
                 stack,
