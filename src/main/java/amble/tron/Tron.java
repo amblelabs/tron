@@ -2,12 +2,14 @@ package amble.tron;
 
 import amble.tron.core.*;
 import amble.tron.core.commands.FactionColorCommand;
+import amble.tron.core.entities.LightCycleEntity;
 import dev.amble.lib.container.RegistryContainer;
 import net.fabricmc.api.ModInitializer;
 
 import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
@@ -36,6 +38,9 @@ public class Tron implements ModInitializer {
 
         // Set initial faction color on join
         registerPlayerFactionColor();
+
+        // register entity attributes
+        registerEntityAttributes();
 	}
 
     private void registerPlayerFactionColor() {
@@ -43,5 +48,9 @@ public class Tron implements ModInitializer {
             ServerPlayerEntity player = serverPlayNetworkHandler.getPlayer();
             TronAttachmentUtil.setInitialPlayerFaction(player);
         });
+    }
+
+    private void registerEntityAttributes() {
+        FabricDefaultAttributeRegistry.register(TronEntities.LIGHT_CYCLE, LightCycleEntity.createLivingAttributes());
     }
 }
