@@ -2,6 +2,7 @@ package amble.tron.client;
 
 import amble.tron.Tron;
 import amble.tron.client.render.IdentityDiscThrownItemRenderer;
+import amble.tron.core.Keybindings;
 import amble.tron.core.TronAttachmentTypes;
 import amble.tron.core.TronEntities;
 import amble.tron.core.items.IdentityDiscItem;
@@ -9,7 +10,7 @@ import amble.tron.core.items.LightSuitItem;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
@@ -23,6 +24,7 @@ public class TronClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         TronAttachmentTypes.init();
+        Keybindings.init();
         EntityRendererRegistry.register(TronEntities.IDENTITY_DISC, IdentityDiscThrownItemRenderer::new);
         registerClientReceivers();
     }
@@ -30,18 +32,22 @@ public class TronClient implements ClientModInitializer {
     private void registerClientReceivers() {
         ClientPlayNetworking.registerGlobalReceiver(ATTACHMENT_UPDATE, (client, handler, buf, responseSender) -> {
             Identifier attachmentId = buf.readIdentifier(); // must match the server order
+            int targetId = buf.readInt();
             float x = buf.readFloat();
             float y = buf.readFloat();
             float z = buf.readFloat();
             Vector3f color = new Vector3f(x, y, z);
 
             client.execute(() -> {
-                if (client.player == null) return;
+                if (client.world == null) return;
                 if (attachmentId.equals(Tron.of("faction_color"))) {
-                    if (!client.player.hasAttached(TronAttachmentTypes.FACTION_COLOR)) {
-                        client.player.setAttached(TronAttachmentTypes.FACTION_COLOR, color);
+                    if (!(client.world.getEntityById(targetId) instanceof PlayerEntity targetPlayer)) {
+                        return;
+                    }
+                    if (!targetPlayer.hasAttached(TronAttachmentTypes.FACTION_COLOR)) {
+                        targetPlayer.setAttached(TronAttachmentTypes.FACTION_COLOR, color);
                     } else {
-                        client.player.modifyAttached(TronAttachmentTypes.FACTION_COLOR, vector3f -> color);
+                        targetPlayer.modifyAttached(TronAttachmentTypes.FACTION_COLOR, vector3f -> color);
                     }
                 }
             });

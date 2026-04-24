@@ -37,7 +37,7 @@ public class TronAttachmentUtil {
         Vector3f factionColor;
         player.modifyAttached(TronAttachmentTypes.FACTION_COLOR, (vector3f -> color));
         factionColor = player.getAttached(TronAttachmentTypes.FACTION_COLOR);
-        sendFactionColorUpdate(player, color);
+        sendFactionColorUpdate(player, factionColor != null ? factionColor : color);
     }
 
     public static final Identifier ATTACHMENT_UPDATE = Tron.of("attachment_update");
