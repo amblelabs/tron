@@ -1,7 +1,5 @@
 package amble.tron.core.entities;
 
-import amble.tron.core.TronEntities;
-import amble.tron.core.entities.lighttrail.LightTrailSegmentEntity;
 import net.minecraft.entity.*;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -293,10 +291,7 @@ public class LightCycleEntity extends LivingEntity {
             prevPosVec = this.getPos().toVector3f();
         }
 
-        LightTrailSegmentEntity seg = new LightTrailSegmentEntity(TronEntities.LIGHT_TRAIL_SEGMENT, this.getWorld(), backX, y, backZ, 0.1, 1.5, 6000, this.getPos().toVector3f(), prevPosVec);
-        seg.setYaw(this.getYaw());
-        // optionally set owner UUID on seg to prevent self-collisions
-        this.getWorld().spawnEntity(seg);
+        // Do the queue system for the points of which the lightcycle will store - Loqor
 
         // remember this segment's center for the next one
         this.lastTrailSegmentPos = new Vec3d(backX, y, backZ);
