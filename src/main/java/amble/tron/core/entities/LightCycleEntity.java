@@ -102,16 +102,10 @@ public class LightCycleEntity extends LivingEntity {
             // Trail disappears if not moving fast enough
             float alpha = this.getVelocity().lengthSquared() > 0.01 ? 1.0f : 0.0f;
             this.visualTrail.add(v1, v2, alpha);
-            return;
-        }
-
-        if (!this.getWorld().isClient()) {
+            
+            // Client-side physics colliders for prediction
             double speedSq = (this.getX() - this.prevX) * (this.getX() - this.prevX) + (this.getZ() - this.prevZ) * (this.getZ() - this.prevZ);
-
             if (speedSq > 0.001 || this.getVelocity().lengthSquared() > 0.01) {
-                double yawRad = Math.toRadians(this.getYaw());
-                double backX = this.getX() + Math.sin(yawRad) * 1.5;
-                double backZ = this.getZ() - Math.cos(yawRad) * 1.5;
                 Vec3d curPoint = new Vec3d(backX, this.getY(), backZ);
 
                 if (!this.serverTrailPoints.isEmpty()) {
@@ -136,48 +130,111 @@ public class LightCycleEntity extends LivingEntity {
                 }
             }
 
-            Box myBox = this.getBoundingBox();
-            boolean collided = false;
+            for (TrailCollider collider : this.serverTrailColliders) {
+                collider.age++;
+                if (!collider.canKill) {
+                    double boxCenterX = (collider.box.minX + collider.box.maxX) / 2.0;
+                    double boxCenterZ = (collider.box.minZ + collider.box.maxZ) / 2.0;
+                    double distSq = (this.getX() - boxCenterX) * (this.getX() - boxCenterX) + (this.getZ() - boxCenterZ) * (this.getZ() - boxCenterZ);
 
-            // Check against other cycles using an expansion matching max trail distance to catch far away cycles.
-            java.util.List<LightCycleEntity> cycles = this.getWorld().getEntitiesByClass(LightCycleEntity.class, myBox.expand(256.0), e -> true);
-            for (LightCycleEntity otherCycle : cycles) {
-                if (otherCycle == this) continue;
-                for (TrailCollider collider : otherCycle.serverTrailColliders) {
-                    if (myBox.intersects(collider.box)) {
-                        collided = true;
-                        break;
+                    if (collider.age > 8 || distSq > 2.25) {
+                        collider.canKill = true;
                     }
                 }
-                if (collided) break;
+            }
+            return;
+        }
+
+        if (!this.getWorld().isClient()) {
+            Vec3d backPos = new Vec3d(this.getX() + Math.sin(Math.toRadians(this.getYaw())) * 1.5, this.getY(), this.getZ() - Math.cos(Math.toRadians(this.getYaw())) * 1.5);
+
+            boolean shouldAddBox = false;
+            if (this.serverTrailPoints.isEmpty()) {
+                shouldAddBox = true;
+            } else {
+                Vec3d lastPoint = this.serverTrailPoints.getFirst();
+                if (lastPoint.squaredDistanceTo(backPos) > 0.05) {
+                    shouldAddBox = true;
+                }
             }
 
-            // Check against self using the canKill flag or age to prevent instant self-destruction from the tail
-            if (!collided) {
-                for (TrailCollider collider : this.serverTrailColliders) {
-                    collider.age++;
+            if (shouldAddBox) {
+                if (!this.serverTrailPoints.isEmpty()) {
+                    Vec3d prevPoint = this.serverTrailPoints.getFirst();
+                    double minX = Math.min(prevPoint.x, backPos.x) - 0.2;
+                    double maxX = Math.max(prevPoint.x, backPos.x) + 0.2;
+                    double minY = Math.min(prevPoint.y, backPos.y);
+                    double maxY = Math.max(prevPoint.y, backPos.y) + 1.2;
+                    double minZ = Math.min(prevPoint.z, backPos.z) - 0.2;
+                    double maxZ = Math.max(prevPoint.z, backPos.z) + 0.2;
+                    Box segmentBox = new Box(minX, minY, minZ, maxX, maxY, maxZ);
 
-                    // Activate canKill if it has existed long enough or the cycle has moved far enough away
-                    if (!collider.canKill) {
-                        double boxCenterX = (collider.box.minX + collider.box.maxX) / 2.0;
-                        double boxCenterZ = (collider.box.minZ + collider.box.maxZ) / 2.0;
-                        double distSq = (this.getX() - boxCenterX) * (this.getX() - boxCenterX) + (this.getZ() - boxCenterZ) * (this.getZ() - boxCenterZ);
+                    this.serverTrailColliders.addFirst(new TrailCollider(segmentBox));
+                    if (this.serverTrailColliders.size() > 512) {
+                        this.serverTrailColliders.removeLast();
+                    }
+                }
 
-                        // Age > 15 ticks or distance > 3 blocks
-                        if (collider.age > 15 || distSq > 9.0) {
-                            collider.canKill = true;
+                this.serverTrailPoints.addFirst(backPos);
+                if (this.serverTrailPoints.size() > 513) {
+                    this.serverTrailPoints.removeLast();
+                }
+            }
+
+            Box myBox = this.getBoundingBox();
+            Box sweptBox = myBox.union(new Box(this.prevX - this.getWidth()/2, this.prevY, this.prevZ - this.getWidth()/2, this.prevX + this.getWidth()/2, this.prevY + this.getHeight(), this.prevZ + this.getWidth()/2));
+
+            boolean collided = false;
+
+            // Kill any entities touching our beam
+            for (TrailCollider collider : this.serverTrailColliders) {
+                collider.age++;
+                if (!collider.canKill) {
+                    double boxCenterX = (collider.box.minX + collider.box.maxX) / 2.0;
+                    double boxCenterZ = (collider.box.minZ + collider.box.maxZ) / 2.0;
+                    double distSq = (this.getX() - boxCenterX) * (this.getX() - boxCenterX) + (this.getZ() - boxCenterZ) * (this.getZ() - boxCenterZ);
+
+                    // Drop threshold drastically: 4 ticks or distance > 0.8 blocks to allow sharp turns to kill you
+                    if (collider.age > 4 || distSq > 0.8) {
+                        collider.canKill = true;
+                    }
+                }
+
+                if (collider.canKill) {
+                    java.util.List<Entity> touchingEntities = this.getWorld().getOtherEntities(this, collider.box);
+                    for (Entity e : touchingEntities) {
+                        if (e instanceof LivingEntity && !this.getPassengerList().contains(e)) {
+                            e.damage(this.getDamageSources().generic(), Float.MAX_VALUE);
+                            if (e instanceof LightCycleEntity cycle) {
+                                cycle.damage(this.getDamageSources().generic(), Float.MAX_VALUE);
+                                cycle.kill();
+                            }
                         }
                     }
 
-                    if (collider.canKill && myBox.intersects(collider.box)) {
+                    // Use sweptBox to prevent tunneling
+                    if (sweptBox.intersects(collider.box)) {
                         collided = true;
-                        break;
                     }
                 }
             }
 
             if (collided) {
                 this.damage(this.getDamageSources().generic(), Float.MAX_VALUE);
+                this.kill();
+            }
+
+            // Check against other cycles' beams (just in case they haven't processed yet)
+            java.util.List<LightCycleEntity> cycles = this.getWorld().getEntitiesByClass(LightCycleEntity.class, myBox.expand(256.0), e -> true);
+            for (LightCycleEntity otherCycle : cycles) {
+                if (otherCycle == this) continue;
+                for (TrailCollider collider : otherCycle.serverTrailColliders) {
+                    if (collider.canKill && sweptBox.intersects(collider.box)) {
+                        this.damage(this.getDamageSources().generic(), Float.MAX_VALUE);
+                        this.kill();
+                        break;
+                    }
+                }
             }
         }
 
