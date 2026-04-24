@@ -43,8 +43,16 @@ public class LightCycleEntity extends LivingEntity {
     public float tilt = 0.0f;
     public float prevTilt = 0.0f;
 
-    public LightCycleEntity(EntityType<? extends LivingEntity> type, World world) {
-        super(type, world);
+    private boolean boosting = false;
+
+    @Override
+    public double getMountedHeightOffset() {
+        return super.getMountedHeightOffset() - 0.7; // Lower the camera
+    }
+
+    public LightCycleEntity(EntityType<? extends LivingEntity> entityType, World world) {
+        super(entityType, world);
+        this.setStepHeight(1f);
     }
 
 

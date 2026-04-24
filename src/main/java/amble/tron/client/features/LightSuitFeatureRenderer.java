@@ -109,10 +109,11 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
 
         if (bl && !(livingEntity.getMainHandStack().getItem() instanceof IdentityDiscItem) && !livingEntity.getItemCooldownManager().isCoolingDown(amble.tron.core.TronItems.IDENTITY_DISC)) {
             matrixStack.push();
-            matrixStack.multiply(RotationAxis.POSITIVE_X.rotation(this.getContextModel().body.pitch));
-            matrixStack.multiply(RotationAxis.POSITIVE_Y.rotation(this.getContextModel().body.yaw));
+
+            this.getContextModel().body.rotate(matrixStack);
+
             matrixStack.scale(0.6f, 0.6f, 0.6f);
-            matrixStack.translate(0, 0.3f + (livingEntity.isInSneakingPose() ? 0.3 : 0), 0.25f - (livingEntity.isInSneakingPose() ? 0.15 : 0));
+            matrixStack.translate(0, 0.3f, 0.25f);
             matrixStack.multiply(RotationAxis.NEGATIVE_Z.rotationDegrees(90));
 
             ItemStack renderDisc = new ItemStack(amble.tron.core.TronItems.IDENTITY_DISC);

@@ -27,6 +27,9 @@ import net.minecraft.util.Arm;
 
 import static amble.tron.client.features.LightSuitFeatureRenderer.LIGHTSUIT_LIGHTS;
 import static amble.tron.client.features.LightSuitFeatureRenderer.LIGHTSUIT_TEXTURE;
+import amble.tron.core.entities.LightCycleEntity;
+import net.minecraft.util.math.RotationAxis;
+import net.minecraft.util.math.MathHelper;
 
 @Mixin(PlayerEntityRenderer.class)
 public abstract class PlayerEntityRendererMixin
@@ -48,6 +51,22 @@ public abstract class PlayerEntityRendererMixin
         this.addFeature(new LightSuitFeatureRenderer<>(renderer, ctx.getModelLoader(), getModel()));
     }
 
+    @Inject(method = "setupTransforms(Lnet/minecraft/client/network/AbstractClientPlayerEntity;Lnet/minecraft/client/util/math/MatrixStack;FFF)V", at = @At("TAIL"))
+    private void tron$setupTransforms(AbstractClientPlayerEntity entity, MatrixStack matrices, float animationProgress, float bodyYaw, float tickDelta, CallbackInfo ci) {
+        if (entity.getVehicle() instanceof LightCycleEntity cycle) {
+            float currentTilt = MathHelper.lerp(tickDelta, cycle.prevTilt, cycle.tilt);
+            matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-currentTilt));
+        }
+    }
+
+    @Inject(method = "render(Lnet/minecraft/client/network/AbstractClientPlayerEntity;FFLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V", at = @At("HEAD"))
+    private void tron$render(AbstractClientPlayerEntity entity, float yaw, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, CallbackInfo ci) {
+        if (entity.getVehicle() instanceof LightCycleEntity cycle) {
+            entity.setBodyYaw(cycle.getYaw());
+            entity.prevBodyYaw = cycle.getYaw();
+        }
+    }
+
     @Inject(method = "renderArm", at = @At("HEAD"), cancellable = true)
     private void ait$renderArm(MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, AbstractClientPlayerEntity player, ModelPart arm, ModelPart sleeve, CallbackInfo ci) {
         ItemStack stack = player.getEquippedStack(EquipmentSlot.CHEST);
@@ -62,6 +81,8 @@ public abstract class PlayerEntityRendererMixin
         playerEntityModel.leaningPitch = 0.0f;
         playerEntityModel.setAngles(player, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
         arm.pitch = 0.0f;
+        arm.yaw = 0.0f;
+        arm.roll = 0.0f;
 
         boolean rightHanded = player.getMainArm() == Arm.RIGHT;
 

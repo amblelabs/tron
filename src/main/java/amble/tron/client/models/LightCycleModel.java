@@ -4,6 +4,7 @@ import amble.tron.core.entities.LightCycleEntity;
 import net.minecraft.client.model.*;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.entity.model.EntityModel;
+import net.minecraft.client.render.entity.model.PlayerEntityModel;
 import net.minecraft.client.util.math.MatrixStack;
 
 public class LightCycleModel extends EntityModel<LightCycleEntity> {
@@ -333,27 +334,27 @@ public class LightCycleModel extends EntityModel<LightCycleEntity> {
 
 		ModelPartData cube_r85 = bone13.addChild("cube_r85", ModelPartBuilder.create().uv(130, 37).cuboid(-0.5F, -3.0F, -4.0F, 1.0F, 4.0F, 8.0F, new Dilation(0.0F)), ModelTransform.of(-5.1161F, 2.6671F, 8.8455F, -1.5708F, 0.6545F, 0.0F));
 
-		ModelPartData bone15 = modelPartData.addChild("bone15", ModelPartBuilder.create().uv(108, 54).cuboid(-11.0F, 7.4506F, 1.1035F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)), ModelTransform.pivot(8.25F, 12.4896F, -25.9535F));
+		ModelPartData bone15 = modelPartData.addChild("bone15", ModelPartBuilder.create().uv(108, 54).cuboid(-11.0F, 7.4506F, 1.1035F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)).mirrored(false), ModelTransform.pivot(8.25F, 12.4896F, -25.9535F));
 
-		ModelPartData cube_r86 = bone15.addChild("cube_r86", ModelPartBuilder.create().uv(130, 49).cuboid(-11.0F, -0.5F, 0.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)), ModelTransform.of(0.0F, -0.7284F, 0.5086F, -2.3562F, 0.0F, 0.0F));
+		ModelPartData cube_r86 = bone15.addChild("cube_r86", ModelPartBuilder.create().uv(130, 49).cuboid(-11.0F, -0.5F, 0.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)).mirrored(false), ModelTransform.of(0.0F, -0.7284F, 0.5086F, -2.3562F, 0.0F, 0.0F));
 
-		ModelPartData cube_r87 = bone15.addChild("cube_r87", ModelPartBuilder.create().uv(108, 54).cuboid(-11.0F, -0.5F, 1.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)), ModelTransform.of(0.0F, 0.9879F, -1.8592F, -1.5708F, 0.0F, 0.0F));
+		ModelPartData cube_r87 = bone15.addChild("cube_r87", ModelPartBuilder.create().uv(108, 54).cuboid(-11.0F, -0.5F, 1.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)).mirrored(false), ModelTransform.of(0.0F, 0.9879F, -1.8592F, -1.5708F, 0.0F, 0.0F));
 
-		ModelPartData cube_r88 = bone15.addChild("cube_r88", ModelPartBuilder.create().uv(130, 49).cuboid(-11.0F, -0.5F, 0.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)), ModelTransform.of(0.0F, 5.5829F, -1.6127F, -0.7854F, 0.0F, 0.0F));
+		ModelPartData cube_r88 = bone15.addChild("cube_r88", ModelPartBuilder.create().uv(130, 49).cuboid(-11.0F, -0.5F, 0.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)).mirrored(false), ModelTransform.of(0.0F, 5.5829F, -1.6127F, -0.7854F, 0.0F, 0.0F));
 
-		ModelPartData cube_r89 = bone15.addChild("cube_r89", ModelPartBuilder.create().uv(108, 54).cuboid(-4.0F, -1.0F, -1.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)), ModelTransform.of(-7.0F, -1.4749F, 3.1035F, 3.1416F, 0.0F, 0.0F));
+		ModelPartData cube_r89 = bone15.addChild("cube_r89", ModelPartBuilder.create().uv(108, 54).cuboid(-4.0F, -1.0F, -1.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)).mirrored(false), ModelTransform.of(-7.0F, -1.4749F, 3.1035F, 3.1416F, 0.0F, 0.0F));
 
-		ModelPartData cube_r90 = bone15.addChild("cube_r90", ModelPartBuilder.create().uv(130, 49).cuboid(-4.0F, -1.0F, -3.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)), ModelTransform.of(-7.0F, 5.9364F, 7.1734F, 0.7854F, 0.0F, 0.0F));
+		ModelPartData cube_r90 = bone15.addChild("cube_r90", ModelPartBuilder.create().uv(130, 49).cuboid(-4.0F, -1.0F, -3.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)).mirrored(false), ModelTransform.of(-7.0F, 5.9364F, 7.1734F, 0.7854F, 0.0F, 0.0F));
 
-		ModelPartData cube_r91 = bone15.addChild("cube_r91", ModelPartBuilder.create().uv(108, 54).cuboid(-4.0F, -1.0F, -2.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)), ModelTransform.of(-7.0F, 2.9879F, 7.5663F, 1.5708F, 0.0F, 0.0F));
+		ModelPartData cube_r91 = bone15.addChild("cube_r91", ModelPartBuilder.create().uv(108, 54).cuboid(-4.0F, -1.0F, -2.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)).mirrored(false), ModelTransform.of(-7.0F, 2.9879F, 7.5663F, 1.5708F, 0.0F, 0.0F));
 
 		ModelPartData cube_r92 = bone15.addChild("cube_r92", ModelPartBuilder.create().uv(130, 49).cuboid(-0.5F, 0.0F, -2.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)), ModelTransform.of(-10.5F, 0.3322F, 5.0521F, 2.3562F, 0.0F, 0.0F));
 
-		ModelPartData bone16 = modelPartData.addChild("bone16", ModelPartBuilder.create().uv(108, 54).cuboid(-11.0F, 7.4506F, 1.1036F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)), ModelTransform.pivot(8.25F, 12.4896F, 14.0465F));
+		ModelPartData bone16 = modelPartData.addChild("bone16", ModelPartBuilder.create().uv(108, 54).cuboid(-11.0F, 7.4506F, 1.1036F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)).mirrored(false), ModelTransform.pivot(8.25F, 12.4896F, 14.0465F));
 
 		ModelPartData cube_r93 = bone16.addChild("cube_r93", ModelPartBuilder.create().uv(130, 49).cuboid(-11.0F, -0.5F, 0.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)), ModelTransform.of(0.0F, -0.7284F, 0.5086F, -2.3562F, 0.0F, 0.0F));
 
-		ModelPartData cube_r94 = bone16.addChild("cube_r94", ModelPartBuilder.create().uv(108, 54).cuboid(-11.0F, -0.5F, 1.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)), ModelTransform.of(0.0F, 0.9879F, -1.8592F, -1.5708F, 0.0F, 0.0F));
+		ModelPartData cube_r94 = bone16.addChild("cube_r94", ModelPartBuilder.create().uv(108, 54).cuboid(-11.0F, -0.5F, 1.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)).mirrored(false), ModelTransform.of(0.0F, 0.9879F, -1.8592F, -1.5708F, 0.0F, 0.0F));
 
 		ModelPartData cube_r95 = bone16.addChild("cube_r95", ModelPartBuilder.create().uv(130, 49).cuboid(-11.0F, -0.5F, 0.0F, 1.0F, 2.0F, 3.0F, new Dilation(0.1F)), ModelTransform.of(0.0F, 5.5829F, -1.6128F, -0.7854F, 0.0F, 0.0F));
 
@@ -412,7 +413,7 @@ public class LightCycleModel extends EntityModel<LightCycleEntity> {
 		.uv(5, 14).mirrored().cuboid(1.0F, 0.0F, -1.0F, 1.0F, 1.0F, 1.0F, new Dilation(0.0F)).mirrored(false), ModelTransform.pivot(0.121F, -0.3017F, -0.1118F));
 
 		ModelPartData bone27 = modelPartData.addChild("bone27", ModelPartBuilder.create().uv(10, 149).mirrored().cuboid(-3.75F, 1.55F, -4.0F, 0.0F, 2.0F, 6.0F, new Dilation(0.01F)).mirrored(false)
-		.uv(10, 149).mirrored().cuboid(1.25F, 1.55F, -4.0F, 0.0F, 2.0F, 6.0F, new Dilation(0.01F)).mirrored(false)
+		.uv(10, 149).mirrored().cuboid(1.25F, 1.55F, -4.0F, 0.0F, 2.0F, 6.0F, new Dilation(0.01F))
 		.uv(6, 160).mirrored().cuboid(-3.75F, 0.0F, 2.325F, 5.0F, 5.0F, 2.0F, new Dilation(0.1F)).mirrored(false)
 		.uv(2, 138).mirrored().cuboid(-3.75F, 0.0F, -4.25F, 5.0F, 5.0F, 9.0F, new Dilation(0.0F)).mirrored(false), ModelTransform.pivot(-1.75F, 13.75F, -4.75F));
 
@@ -472,27 +473,59 @@ public class LightCycleModel extends EntityModel<LightCycleEntity> {
 	}
 	@Override
 	public void render(MatrixStack matrices, VertexConsumer vertexConsumer, int light, int overlay, float red, float green, float blue, float alpha) {
-		Player.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone7.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone4.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone3.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone26.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone9.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone10.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone14.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone6.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone11.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone8.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone5.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone12.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone2.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone13.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone15.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone16.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
-		bone17.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+			 // Player.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone7.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone4.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone3.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone26.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone9.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone10.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone14.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone6.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone11.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone8.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone5.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone12.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone2.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone13.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone15.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone16.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
+                bone17.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
 		Handle.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
 		Handle2.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
 		bone27.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
 		bb_main.render(matrices, vertexConsumer, light, overlay, red, green, blue, alpha);
 	}
+
+	public static void transformMixinModel(PlayerEntityModel playerEntityModel) {
+		playerEntityModel.body.pivotZ -= 13;
+		playerEntityModel.jacket.pivotZ -= 13;
+
+		playerEntityModel.head.pivotZ -= 13;
+		playerEntityModel.hat.pivotZ -= 13;
+
+		playerEntityModel.leftArm.pivotZ -= 13;
+		playerEntityModel.leftSleeve.pivotZ -= 13;
+
+		playerEntityModel.rightArm.pivotZ -= 13;
+		playerEntityModel.rightSleeve.pivotZ -= 13;
+
+		/*playerEntityModel.body.pivotY += 10;
+		playerEntityModel.jacket.pivotY += 10;
+
+		playerEntityModel.head.pivotY += 10;
+		playerEntityModel.hat.pivotY += 10;
+
+		playerEntityModel.leftArm.pivotY += 10;
+		playerEntityModel.leftSleeve.pivotY += 10;
+
+		playerEntityModel.rightArm.pivotY += 10;
+		playerEntityModel.rightSleeve.pivotY += 10;*/
+
+		playerEntityModel.leftLeg.pivotY -= 10;
+		playerEntityModel.leftPants.pivotY -= 10;
+		playerEntityModel.rightLeg.pivotY -= 10;
+		playerEntityModel.rightPants.pivotY -= 10;
+	}
 }
+
