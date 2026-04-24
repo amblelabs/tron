@@ -35,7 +35,7 @@ public class LightSuitItem extends ArmorItem {
         if (!(world instanceof ServerWorld)) return;
         if (entity instanceof ServerPlayerEntity player && stack.getItem() instanceof LightSuitItem) {
             Vector3f color = TronAttachmentUtil.getFactionColor(player);
-            if (this.getRGB(stack) == color) return;
+            if (this.getRGB(stack).equals(color)) return;
             this.setRGB(player, color, stack);
         }
     }

@@ -24,6 +24,13 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.TypedActionResult;
 import net.minecraft.world.World;
 import org.joml.Vector3f;
+import net.minecraft.entity.attribute.EntityAttribute;
+import net.minecraft.entity.attribute.EntityAttributeModifier;
+import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.entity.EquipmentSlot;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Multimaps;
 
 public class IdentityDiscItem extends Item {
     public static final Identifier CHANGE_COLOR = Tron.of("change_color");
@@ -66,8 +73,8 @@ public class IdentityDiscItem extends Item {
         if (!(world instanceof ServerWorld)) return;
         if (entity instanceof ServerPlayerEntity player && stack.getItem() instanceof IdentityDiscItem) {
             Vector3f factionColor = TronAttachmentUtil.getFactionColor(player);
-            if (this.getRGB(stack) != factionColor) {
-                this.setRGB(player, TronAttachmentUtil.getFactionColor(player), stack);
+            if (!this.getRGB(stack).equals(factionColor)) {
+                this.setRGB(player, factionColor, stack);
             }
         }
     }
@@ -88,7 +95,7 @@ public class IdentityDiscItem extends Item {
         ClientPlayNetworking.send(IdentityDiscItem.RETRACT_BLADE, buf);
     }
 
-    protected void __setBladeRetracted(ItemStack stack, boolean retract) {
+    public void __setBladeRetracted(ItemStack stack, boolean retract) {
         if (!(stack.getItem() instanceof IdentityDiscItem)) return;
         NbtCompound nbt = stack.getOrCreateNbt();
         nbt.putBoolean(bladeRetracted, retract);
@@ -127,6 +134,19 @@ public class IdentityDiscItem extends Item {
 
     public SoundEvent getDefaultSound() {
         return SoundEvents.ITEM_TRIDENT_THROW;
+    }
+
+    @Override
+    public Multimap<EntityAttribute, EntityAttributeModifier> getAttributeModifiers(ItemStack stack, EquipmentSlot slot) {
+        if (slot == EquipmentSlot.MAINHAND && !isBladeRetracted(stack)) {
+            ImmutableMultimap.Builder<EntityAttribute, EntityAttributeModifier> builder = ImmutableMultimap.builder();
+            builder.put(EntityAttributes.GENERIC_ATTACK_DAMAGE, new EntityAttributeModifier(
+                    ATTACK_DAMAGE_MODIFIER_ID, "Weapon modifier", 8.0, EntityAttributeModifier.Operation.ADDITION));
+            builder.put(EntityAttributes.GENERIC_ATTACK_SPEED, new EntityAttributeModifier(
+                    ATTACK_SPEED_MODIFIER_ID, "Weapon modifier", -2.4, EntityAttributeModifier.Operation.ADDITION));
+            return builder.build();
+        }
+        return super.getAttributeModifiers(stack, slot);
     }
 
     public void setRGB(ServerPlayerEntity player, Vector3f vector3f, ItemStack stack) {

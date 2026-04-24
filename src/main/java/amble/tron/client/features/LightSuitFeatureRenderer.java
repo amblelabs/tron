@@ -81,7 +81,15 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
         this.model.leftLeg.copyTransform(getContextModel().leftLeg);
         this.model.rightLeg.copyTransform(getContextModel().rightLeg);
 
-        this.model.render(matrixStack, vertexConsumerProvider.getBuffer(RenderLayer.getEntityTranslucent(LIGHTSUIT_TEXTURE)), i, OverlayTexture.DEFAULT_UV, 1, 1, 1, 1f);
+        this.model.jacket.copyTransform(getContextModel().jacket);
+        this.model.leftSleeve.copyTransform(getContextModel().leftSleeve);
+        this.model.rightSleeve.copyTransform(getContextModel().rightSleeve);
+        this.model.leftPants.copyTransform(getContextModel().leftPants);
+        this.model.rightPants.copyTransform(getContextModel().rightPants);
+
+        if (bl) {
+            this.model.render(matrixStack, vertexConsumerProvider.getBuffer(RenderLayer.getEntityTranslucent(LIGHTSUIT_TEXTURE)), i, OverlayTexture.DEFAULT_UV, 1, 1, 1, 1f);
+        }
 
         Vector3f defaultProgram = new Vector3f(0.5f, 0.7f, 1.0f);
         Vector3f rectified = new Vector3f(1f, 0.5f, 0.1f);
@@ -99,23 +107,29 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
 
         matrixStack.pop();
 
-        matrixStack.push();
-        matrixStack.multiply(RotationAxis.POSITIVE_X.rotation(this.getContextModel().body.pitch));
-        matrixStack.multiply(RotationAxis.POSITIVE_Y.rotation(this.getContextModel().body.yaw));
-        matrixStack.scale(0.6f, 0.6f, 0.6f);
-        matrixStack.translate(0, 0.3f + (livingEntity.isInSneakingPose() ? 0.3 : 0), 0.25f - (livingEntity.isInSneakingPose() ? 0.15 : 0));
-        matrixStack.multiply(RotationAxis.NEGATIVE_Z.rotationDegrees(90));
-
         if (bl && !(livingEntity.getMainHandStack().getItem() instanceof IdentityDiscItem) && !livingEntity.getItemCooldownManager().isCoolingDown(amble.tron.core.TronItems.IDENTITY_DISC)) {
+            matrixStack.push();
+            matrixStack.multiply(RotationAxis.POSITIVE_X.rotation(this.getContextModel().body.pitch));
+            matrixStack.multiply(RotationAxis.POSITIVE_Y.rotation(this.getContextModel().body.yaw));
+            matrixStack.scale(0.6f, 0.6f, 0.6f);
+            matrixStack.translate(0, 0.3f + (livingEntity.isInSneakingPose() ? 0.3 : 0), 0.25f - (livingEntity.isInSneakingPose() ? 0.15 : 0));
+            matrixStack.multiply(RotationAxis.NEGATIVE_Z.rotationDegrees(90));
+
             ItemStack renderDisc = new ItemStack(amble.tron.core.TronItems.IDENTITY_DISC);
-            Vector3f factionColor = TronAttachmentUtil.getFactionColor(livingEntity);
+            Vector3f factionColor = null;
+            if (stack.getItem() instanceof LightSuitItem lightSuitItem) {
+                factionColor = lightSuitItem.getRGB(stack);
+            } else {
+                factionColor = TronAttachmentUtil.getFactionColor(livingEntity);
+            }
             if (factionColor != null && renderDisc.getItem() instanceof IdentityDiscItem fakeDisc) {
                 fakeDisc.__setRGB(factionColor, renderDisc);
+                fakeDisc.__setBladeRetracted(renderDisc, true);
                 MinecraftClient.getInstance().getItemRenderer().renderItem(livingEntity, renderDisc, ModelTransformationMode.FIXED,
                         false, matrixStack, vertexConsumerProvider, null, i, OverlayTexture.DEFAULT_UV, 0);
             }
+            matrixStack.pop();
         }
-        matrixStack.pop();
     }
 
     public void enablePart(M model, BodyParts part) {
