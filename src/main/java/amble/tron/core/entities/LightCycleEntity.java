@@ -40,6 +40,9 @@ public class LightCycleEntity extends LivingEntity {
     public final LinkedList<TrailCollider> serverTrailColliders = new LinkedList<>();
     public final LinkedList<Vec3d> serverTrailPoints = new LinkedList<>();
 
+    public float tilt = 0.0f;
+    public float prevTilt = 0.0f;
+
     public LightCycleEntity(EntityType<? extends LivingEntity> type, World world) {
         super(type, world);
     }
@@ -86,18 +89,27 @@ public class LightCycleEntity extends LivingEntity {
         super.tick();
 
         if (this.getWorld().isClient()) {
+            this.prevTilt = this.tilt;
+            float deltaYaw = net.minecraft.util.math.MathHelper.wrapDegrees(this.getYaw() - this.prevYaw);
+            float targetTilt = net.minecraft.util.math.MathHelper.clamp(deltaYaw * 3.5f, -45.0f, 45.0f);
+            this.tilt = net.minecraft.util.math.MathHelper.lerp(0.3f, this.tilt, targetTilt);
+
             double yawRad = Math.toRadians(this.getYaw());
 
             // Adjust the offset behind the cycle
             double backX = this.getX() + Math.sin(yawRad) * 1.5;
             double backZ = this.getZ() - Math.cos(yawRad) * 1.5;
+            double y = this.getY();
+
+            // Calculate tilted up-vector logic for the beam
+            double tiltRad = Math.toRadians(this.tilt);
+            double upX = -Math.sin(tiltRad) * Math.cos(yawRad);
+            double upY = Math.cos(tiltRad);
+            double upZ = -Math.sin(tiltRad) * Math.sin(yawRad);
 
             // Height of the trail slice (e.g. from y+0.1 to y+1.1)
-            double y1 = this.getY() + 0.1;
-            double y2 = this.getY() + 1.1;
-
-            Vector4f v1 = new Vector4f((float) backX, (float) y1, (float) backZ, 1.0f);
-            Vector4f v2 = new Vector4f((float) backX, (float) y2, (float) backZ, 1.0f);
+            Vector4f v1 = new Vector4f((float) (backX + upX * 0.1), (float) (y + upY * 0.1), (float) (backZ + upZ * 0.1), 1.0f);
+            Vector4f v2 = new Vector4f((float) (backX + upX * 1.1), (float) (y + upY * 1.1), (float) (backZ + upZ * 1.1), 1.0f);
 
             // Trail disappears if not moving fast enough
             float alpha = this.getVelocity().lengthSquared() > 0.01 ? 1.0f : 0.0f;
@@ -294,7 +306,7 @@ public class LightCycleEntity extends LivingEntity {
 
         Vec2f rot = this.getControlledRotation(controllingPlayer);
         this.setRotation(this.getYaw(), rot.x);
-        this.prevYaw = this.bodyYaw = this.headYaw = this.getYaw();
+        this.bodyYaw = this.headYaw = this.getYaw();
 
         if (this.isLogicalSideForUpdatingMovement()) {
             // Acceleration: forward applies thrust in vehicle forward direction
