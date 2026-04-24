@@ -5,6 +5,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.RedstoneLampBlock;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.Frustum;
 import net.minecraft.client.render.RenderLayers;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.entity.EntityRenderer;
@@ -13,6 +14,9 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.RotationAxis;
 import amble.tron.client.render.entity.renderer.TrailRenderer;
+import amble.tron.core.TronAttachmentUtil;
+import net.minecraft.entity.player.PlayerEntity;
+import org.joml.Vector3f;
 
 public class LightCycleEntityRenderer<T extends LightCycleEntity> extends EntityRenderer<T> {
     public LightCycleEntityRenderer(EntityRendererFactory.Context ctx) {
@@ -29,11 +33,14 @@ public class LightCycleEntityRenderer<T extends LightCycleEntity> extends Entity
         matrices.pop();
 
         // Render light trail
-        RenderSystem.setShaderColor(1, 1, 1, 1);
-        TrailRenderer.render(entity.visualTrail, vertexConsumers, matrices.peek());
-        RenderSystem.setShaderColor(1, 0, 0, 1);
+        TrailRenderer.render(entity.visualTrail, vertexConsumers, matrices.peek(), entity.getColor());
 
         super.render(entity, yaw, tickDelta, matrices, vertexConsumers, light);
+    }
+
+    @Override
+    public boolean shouldRender(T entity, Frustum frustum, double x, double y, double z) {
+        return true;
     }
 
     @Override

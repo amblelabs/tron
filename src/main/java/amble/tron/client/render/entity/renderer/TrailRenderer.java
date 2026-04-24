@@ -16,41 +16,59 @@ import org.joml.Vector3f;
 public class TrailRenderer {
     private static final Identifier identifier = Tron.of("textures/entity/trail.png");
 
-    public static void render(Trail trail, VertexConsumerProvider vertexConsumerProvider, MatrixStack.Entry matrices) {
-        if (trail.nullEntries >= trail.size || trail.entries == 0) {
+    public static void render(Trail trail, VertexConsumerProvider vertexConsumerProvider, MatrixStack.Entry matrices, Vector3f color) {
+        int numPoints = Math.min(trail.entries, trail.size);
+        if (trail.nullEntries >= trail.size || numPoints < 2) {
             return;
         }
 
-        VertexConsumer lineVertexConsumer = vertexConsumerProvider.getBuffer(RenderLayer.getBeaconBeam(identifier, true));
+        VertexConsumer lineVertexConsumer = vertexConsumerProvider.getBuffer(RenderLayer.getEyes(identifier));
         int light = 15728640;
 
         Vec3d pos = MinecraftClient.getInstance().gameRenderer.getCamera().getPos();
         Matrix3f matrix = matrices.getNormalMatrix();
 
-        //todo a custom vertex indexing methode would be beneficial here
-        for (int i = 1; i < Math.min(trail.entries, trail.size); i++) {
-            int pre = ((i + trail.lastIndex - 1) % trail.size) * 7;
-            int index = ((i + trail.lastIndex) % trail.size) * 7;
+        int startIdx = trail.entries < trail.size ? 0 : trail.lastIndex;
 
-            int a1 = (int) ((1.0f - ((float) i) / trail.size * 255) * trail.buffer[pre + 6]);
-            int a2 = i == (trail.size - 1) ? 0 : (int) ((1.0f - ((float) i + 1) / trail.size * 255) * trail.buffer[index + 6]);
+        for (int j = 0; j < numPoints - 1; j++) {
+            int preIndex = (startIdx + j) % trail.size;
+            int curIndex = (startIdx + j + 1) % trail.size;
 
-            vertex(trail, lineVertexConsumer, matrix, 0, 0, pre, pos, a1, light);
-            vertex(trail, lineVertexConsumer, matrix, 0, 1, pre + 3, pos, a1, light);
-            vertex(trail, lineVertexConsumer, matrix, 1, 1, index + 3, pos, a2, light);
-            vertex(trail, lineVertexConsumer, matrix, 1, 0, index, pos, a2, light);
+            int pre = preIndex * 7;
+            int index = curIndex * 7;
+
+            // Age is distance from the newest point (head of the trail)
+            int age1 = numPoints - 1 - j;
+            int age2 = numPoints - 1 - (j + 1);
+
+            float fraction1 = Math.max(0.0f, 0.75f * (1.0f - ((float) age1 / trail.size)));
+            float fraction2 = Math.max(0.0f, 0.75f * (1.0f - ((float) age2 / trail.size)));
+
+            float a1 = fraction1 * trail.buffer[pre + 6];
+            float a2 = fraction2 * trail.buffer[index + 6];
+
+            vertex(trail, lineVertexConsumer, matrix, 0, 0, pre, pos, a1, light, color);
+            vertex(trail, lineVertexConsumer, matrix, 0, 1, pre + 3, pos, a1, light, color);
+            vertex(trail, lineVertexConsumer, matrix, 1, 1, index + 3, pos, a2, light, color);
+            vertex(trail, lineVertexConsumer, matrix, 1, 0, index, pos, a2, light, color);
 
             //todo the anti culling here is stupid
-            vertex(trail, lineVertexConsumer, matrix, 1, 0, index, pos, a2, light);
-            vertex(trail, lineVertexConsumer, matrix, 1, 1, index + 3, pos, a2, light);
-            vertex(trail, lineVertexConsumer, matrix, 0, 1, pre + 3, pos, a1, light);
-            vertex(trail, lineVertexConsumer, matrix, 0, 0, pre, pos, a1, light);
+            vertex(trail, lineVertexConsumer, matrix, 1, 0, index, pos, a2, light, color);
+            vertex(trail, lineVertexConsumer, matrix, 1, 1, index + 3, pos, a2, light, color);
+            vertex(trail, lineVertexConsumer, matrix, 0, 1, pre + 3, pos, a1, light, color);
+            vertex(trail, lineVertexConsumer, matrix, 0, 0, pre, pos, a1, light, color);
         }
     }
 
-    private static void vertex(Trail trail, VertexConsumer lineVertexConsumer, Matrix3f matrix, float u, float v, int index, Vec3d pos, float a, int light) {
+    private static void vertex(Trail trail, VertexConsumer lineVertexConsumer, Matrix3f matrix, float u, float v, int index, Vec3d pos, float a, int light, Vector3f color) {
         Vector3f p = new Vector3f((float) (trail.buffer[index] - pos.x), (float) (trail.buffer[index + 1] - pos.y), (float) (trail.buffer[index + 2] - pos.z));
         matrix.transform(p);
-        lineVertexConsumer.vertex(p.x, p.y, p.z, trail.gray, trail.gray, trail.gray, a, u, v, OverlayTexture.DEFAULT_UV, light, 1, 0, 0);
+        
+        // Multiply color by alpha for additive fading effect
+        float r = color.x * a;
+        float g = color.y * a;
+        float b = color.z * a;
+        
+        lineVertexConsumer.vertex(p.x, p.y, p.z, r, g, b, 1.0f, u, v, OverlayTexture.DEFAULT_UV, light, 1, 0, 0);
     }
 }

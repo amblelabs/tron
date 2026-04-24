@@ -1,9 +1,13 @@
 package amble.tron.core.entities;
 
 import amble.tron.core.entities.lighttrail.Trail;
+import amble.tron.core.TronAttachmentUtil;
 import net.minecraft.entity.*;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.data.DataTracker;
+import net.minecraft.entity.data.TrackedData;
+import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.SwordItem;
 import net.minecraft.util.ActionResult;
@@ -16,9 +20,13 @@ import org.joml.Vector3f;
 import org.joml.Vector4f;
 
 import java.util.Collections;
+import java.util.LinkedList;
 
 public class LightCycleEntity extends LivingEntity {
+    private static final TrackedData<Vector3f> FACTION_COLOR = DataTracker.registerData(LightCycleEntity.class, TrackedDataHandlerRegistry.VECTOR3F);
+
     public final Trail visualTrail = new Trail(512);
+    public final LinkedList<Box> serverTrailColliders = new LinkedList<>();
 
     public LightCycleEntity(EntityType<? extends LivingEntity> type, World world) {
         super(type, world);
@@ -48,6 +56,20 @@ public class LightCycleEntity extends LivingEntity {
     }
 
     @Override
+    protected void initDataTracker() {
+        super.initDataTracker();
+        this.dataTracker.startTracking(FACTION_COLOR, new Vector3f(1.0f, 1.0f, 1.0f));
+    }
+
+    public Vector3f getColor() {
+        return this.dataTracker.get(FACTION_COLOR);
+    }
+
+    public void setColor(Vector3f color) {
+        this.dataTracker.set(FACTION_COLOR, color);
+    }
+
+    @Override
     public void tick() {
         super.tick();
 
@@ -71,7 +93,58 @@ public class LightCycleEntity extends LivingEntity {
             return;
         }
 
+        if (!this.getWorld().isClient()) {
+            if (this.getVelocity().lengthSquared() > 0.01) {
+                double yawRad = Math.toRadians(this.getYaw());
+                double backX = this.getX() + Math.sin(yawRad) * 1.5;
+                double backZ = this.getZ() - Math.cos(yawRad) * 1.5;
+                Box segmentBox = new Box(backX - 0.2, this.getY(), backZ - 0.2, backX + 0.2, this.getY() + 1.2, backZ + 0.2);
+
+                this.serverTrailColliders.addFirst(segmentBox);
+                if (this.serverTrailColliders.size() > 512) {
+                    this.serverTrailColliders.removeLast();
+                }
+            }
+
+            Box myBox = this.getBoundingBox();
+            boolean collided = false;
+
+            // Check against other cycles using an expansion matching max trail distance to catch far away cycles.
+            java.util.List<LightCycleEntity> cycles = this.getWorld().getEntitiesByClass(LightCycleEntity.class, myBox.expand(512.0), e -> true);
+            for (LightCycleEntity otherCycle : cycles) {
+                if (otherCycle == this) continue;
+                for (Box collider : otherCycle.serverTrailColliders) {
+                    if (myBox.intersects(collider)) {
+                        collided = true;
+                        break;
+                    }
+                }
+                if (collided) break;
+            }
+
+            // Check against self (skip most recent to prevent instant self-destruction)
+            if (!collided) {
+                int skip = 15;
+                for (Box collider : this.serverTrailColliders) {
+                    if (skip-- > 0) continue;
+                    if (myBox.intersects(collider)) {
+                        collided = true;
+                        break;
+                    }
+                }
+            }
+
+            if (collided) {
+                this.damage(this.getDamageSources().generic(), Float.MAX_VALUE);
+            }
+        }
+
         if (this.getControllingPassenger() instanceof PlayerEntity player) {
+            Vector3f factionColor = TronAttachmentUtil.getFactionColor(player);
+            if (factionColor != null && !factionColor.equals(this.getColor())) {
+                this.setColor(factionColor);
+            }
+
             if (player.getMainHandStack().getItem() instanceof SwordItem) {
                 this.spawnTrailIfNeeded();
             }
@@ -252,11 +325,6 @@ public class LightCycleEntity extends LivingEntity {
     }
 
     @Override
-    protected void initDataTracker() {
-        super.initDataTracker();
-    }
-
-    @Override
     public Iterable<ItemStack> getArmorItems() {
         return Collections.singleton(ItemStack.EMPTY);
     }
@@ -321,3 +389,4 @@ public class LightCycleEntity extends LivingEntity {
         this.lastTrailSegmentPos = new Vec3d(backX, y, backZ);
     }
 }
+
