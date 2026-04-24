@@ -111,12 +111,12 @@ public class LightCycleEntity extends LivingEntity {
             Vector4f v1 = new Vector4f((float) (backX + upX * 0.1), (float) (y + upY * 0.1), (float) (backZ + upZ * 0.1), 1.0f);
             Vector4f v2 = new Vector4f((float) (backX + upX * 1.1), (float) (y + upY * 1.1), (float) (backZ + upZ * 1.1), 1.0f);
 
+            double speedSq = (this.getX() - this.prevX) * (this.getX() - this.prevX) + (this.getZ() - this.prevZ) * (this.getZ() - this.prevZ);
             // Trail disappears if not moving fast enough
-            float alpha = this.getVelocity().lengthSquared() > 0.01 ? 1.0f : 0.0f;
+            float alpha = (this.getVelocity().lengthSquared() > 0.01 || speedSq > 0.001) ? 1.0f : 0.0f;
             this.visualTrail.add(v1, v2, alpha);
             
             // Client-side physics colliders for prediction
-            double speedSq = (this.getX() - this.prevX) * (this.getX() - this.prevX) + (this.getZ() - this.prevZ) * (this.getZ() - this.prevZ);
             if (speedSq > 0.001 || this.getVelocity().lengthSquared() > 0.01) {
                 Vec3d curPoint = new Vec3d(backX, this.getY(), backZ);
 
@@ -310,8 +310,9 @@ public class LightCycleEntity extends LivingEntity {
 
         if (this.isLogicalSideForUpdatingMovement()) {
             // Acceleration: forward applies thrust in vehicle forward direction
-            double forward = forwardInput;
-            double accel = (forward > 0.0F ? forward : forward * 0.2F) * 0.2; // reverse slower
+            double forward = Math.max(0.0F, forwardInput);
+            double accel = forward * 0.2;
+
             double yawRad = Math.toRadians(this.getYaw());
             double ax = -Math.sin(yawRad) * accel;
             double az = Math.cos(yawRad) * accel;

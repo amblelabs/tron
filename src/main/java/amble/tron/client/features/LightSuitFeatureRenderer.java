@@ -105,13 +105,15 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
         matrixStack.scale(0.6f, 0.6f, 0.6f);
         matrixStack.translate(0, 0.3f + (livingEntity.isInSneakingPose() ? 0.3 : 0), 0.25f - (livingEntity.isInSneakingPose() ? 0.15 : 0));
         matrixStack.multiply(RotationAxis.NEGATIVE_Z.rotationDegrees(90));
-        ItemStack disc = livingEntity.getInventory().getStack(0);
-        if (disc.getItem() instanceof IdentityDiscItem discItem && disc != livingEntity.getMainHandStack() && !livingEntity.getItemCooldownManager().isCoolingDown(disc.getItem())) {
-            /*if (finalProgram != discItem.getRGB(disc)) {
-                discItem.setRGB(finalProgram, disc);
-            }*/
-            MinecraftClient.getInstance().getItemRenderer().renderItem(livingEntity, disc, ModelTransformationMode.FIXED,
-                    false, matrixStack, vertexConsumerProvider, null, i, OverlayTexture.DEFAULT_UV, 0);
+
+        if (bl && !(livingEntity.getMainHandStack().getItem() instanceof IdentityDiscItem) && !livingEntity.getItemCooldownManager().isCoolingDown(amble.tron.core.TronItems.IDENTITY_DISC)) {
+            ItemStack renderDisc = new ItemStack(amble.tron.core.TronItems.IDENTITY_DISC);
+            Vector3f factionColor = TronAttachmentUtil.getFactionColor(livingEntity);
+            if (factionColor != null && renderDisc.getItem() instanceof IdentityDiscItem fakeDisc) {
+                fakeDisc.__setRGB(factionColor, renderDisc);
+                MinecraftClient.getInstance().getItemRenderer().renderItem(livingEntity, renderDisc, ModelTransformationMode.FIXED,
+                        false, matrixStack, vertexConsumerProvider, null, i, OverlayTexture.DEFAULT_UV, 0);
+            }
         }
         matrixStack.pop();
     }
