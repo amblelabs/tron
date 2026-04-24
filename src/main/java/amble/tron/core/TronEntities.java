@@ -4,7 +4,6 @@ import amble.tron.core.entities.IdentityDiscThrownEntity;
 import amble.tron.core.entities.LightCycleEntity;
 import dev.amble.lib.container.impl.EntityContainer;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityTypeBuilder;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityDimensions;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.SpawnGroup;

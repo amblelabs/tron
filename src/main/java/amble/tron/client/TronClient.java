@@ -2,7 +2,7 @@ package amble.tron.client;
 
 import amble.tron.Tron;
 import amble.tron.client.render.IdentityDiscThrownItemRenderer;
-import amble.tron.client.render.LightCycleEntityRenderer;
+import amble.tron.client.render.entity.renderer.LightCycleEntityRenderer;
 import amble.tron.core.Keybindings;
 import amble.tron.core.TronAttachmentTypes;
 import amble.tron.core.TronEntities;

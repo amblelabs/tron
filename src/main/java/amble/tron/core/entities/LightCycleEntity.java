@@ -1,5 +1,6 @@
 package amble.tron.core.entities;
 
+import amble.tron.core.entities.lighttrail.Trail;
 import net.minecraft.entity.*;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -12,10 +13,13 @@ import net.minecraft.util.math.*;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
+import org.joml.Vector4f;
 
 import java.util.Collections;
 
 public class LightCycleEntity extends LivingEntity {
+    public final Trail visualTrail = new Trail(512);
+
     public LightCycleEntity(EntityType<? extends LivingEntity> type, World world) {
         super(type, world);
     }
@@ -46,7 +50,27 @@ public class LightCycleEntity extends LivingEntity {
     @Override
     public void tick() {
         super.tick();
-        if (this.getWorld().isClient()) return;
+
+        if (this.getWorld().isClient()) {
+            double yawRad = Math.toRadians(this.getYaw());
+
+            // Adjust the offset behind the cycle
+            double backX = this.getX() + Math.sin(yawRad) * 1.5;
+            double backZ = this.getZ() - Math.cos(yawRad) * 1.5;
+
+            // Height of the trail slice (e.g. from y+0.1 to y+1.1)
+            double y1 = this.getY() + 0.1;
+            double y2 = this.getY() + 1.1;
+
+            Vector4f v1 = new Vector4f((float) backX, (float) y1, (float) backZ, 1.0f);
+            Vector4f v2 = new Vector4f((float) backX, (float) y2, (float) backZ, 1.0f);
+
+            // Trail disappears if not moving fast enough
+            float alpha = this.getVelocity().lengthSquared() > 0.01 ? 1.0f : 0.0f;
+            this.visualTrail.add(v1, v2, alpha);
+            return;
+        }
+
         if (this.getControllingPassenger() instanceof PlayerEntity player) {
             if (player.getMainHandStack().getItem() instanceof SwordItem) {
                 this.spawnTrailIfNeeded();

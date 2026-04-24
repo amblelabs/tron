@@ -1,20 +1,16 @@
 package amble.tron.core.items;
 
 import amble.tron.Tron;
-import amble.tron.core.TronAttachmentTypes;
 import amble.tron.core.TronAttachmentUtil;
 import amble.tron.core.entities.IdentityDiscThrownEntity;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.ItemCooldownManager;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -127,10 +123,6 @@ public class IdentityDiscItem extends Item {
         cooldownManager.set(this, 40);
 
         return TypedActionResult.success(itemStack, world.isClient());
-    }
-
-    public Item getDefaultItem() {
-        return Items.SNOWBALL;
     }
 
     public SoundEvent getDefaultSound() {

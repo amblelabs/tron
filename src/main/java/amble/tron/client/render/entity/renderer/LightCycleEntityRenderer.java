@@ -1,6 +1,7 @@
-package amble.tron.client.render;
+package amble.tron.client.render.entity.renderer;
 
 import amble.tron.core.entities.LightCycleEntity;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.RedstoneLampBlock;
 import net.minecraft.client.MinecraftClient;
@@ -11,6 +12,7 @@ import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.RotationAxis;
+import amble.tron.client.render.entity.renderer.TrailRenderer;
 
 public class LightCycleEntityRenderer<T extends LightCycleEntity> extends EntityRenderer<T> {
     public LightCycleEntityRenderer(EntityRendererFactory.Context ctx) {
@@ -25,6 +27,12 @@ public class LightCycleEntityRenderer<T extends LightCycleEntity> extends Entity
         MinecraftClient.getInstance().getBlockRenderManager().renderBlock(Blocks.REDSTONE_LAMP.getDefaultState().with(RedstoneLampBlock.LIT, true), entity.getBlockPos(),
                 entity.getWorld(), matrices, vertexConsumers.getBuffer(RenderLayers.getBlockLayer(Blocks.REDSTONE_LAMP.getDefaultState())), false, entity.getWorld().getRandom());
         matrices.pop();
+
+        // Render light trail
+        RenderSystem.setShaderColor(1, 1, 1, 1);
+        TrailRenderer.render(entity.visualTrail, vertexConsumers, matrices.peek());
+        RenderSystem.setShaderColor(1, 0, 0, 1);
+
         super.render(entity, yaw, tickDelta, matrices, vertexConsumers, light);
     }
 
