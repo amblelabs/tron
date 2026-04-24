@@ -30,7 +30,6 @@ public class Tron implements ModInitializer {
 	public void onInitialize() {
         RegistryContainer.register(TronItems.class, MOD_ID);
         RegistryContainer.register(TronEntities.class, MOD_ID);
-        Keybindings.init();
         TronAttachmentTypes.init();
         CommandRegistrationCallback.EVENT.register(((commandDispatcher, commandRegistryAccess, registrationEnvironment) -> {
             FactionColorCommand.register(commandDispatcher);

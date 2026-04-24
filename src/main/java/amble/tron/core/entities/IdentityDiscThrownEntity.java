@@ -128,7 +128,7 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
     public void onDataTrackerUpdate(List<DataTracker.SerializedEntry<?>> dataEntries) {
         super.onDataTrackerUpdate(dataEntries);
         // Keep local state consistent with tracked color (no logic here beyond sync).
-        this.setColor(this.getDataTracker().get(COLOR));
+        this.setColor(this.getColor());
     }
 
     @Override

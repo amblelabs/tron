@@ -1,7 +1,5 @@
 package amble.tron.client.render;
 
-import amble.tron.core.TronAttachmentTypes;
-import amble.tron.core.TronAttachmentUtil;
 import amble.tron.core.entities.IdentityDiscThrownEntity;
 import amble.tron.core.items.IdentityDiscItem;
 import net.fabricmc.api.EnvType;
@@ -16,7 +14,6 @@ import net.minecraft.client.render.model.json.ModelTransformationMode;
 import net.minecraft.client.texture.SpriteAtlasTexture;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
@@ -57,10 +54,6 @@ public class IdentityDiscThrownItemRenderer<T extends Entity>
             return;
         }
 
-        if (!(flyingItem.getOwner() instanceof PlayerEntity player)) {
-            return;
-        }
-
         boolean bl = !flyingItem.isInGround();
 
         matrices.push();
@@ -77,14 +70,19 @@ public class IdentityDiscThrownItemRenderer<T extends Entity>
             matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(spinAngle));
         }
 
-        ItemStack stack = flyingItem.asItemStack();
+        ItemStack original = flyingItem.asItemStack();
+        if (!(original.getItem() instanceof IdentityDiscItem disc)) {
+            matrices.pop();
+            super.render(entity, yaw, tickDelta, matrices, vertexConsumers, light);
+            return;
+        }
 
-        if (!(stack.getItem() instanceof IdentityDiscItem disc)) return;
-
-        disc.__setRGB(TronAttachmentUtil.getFactionColor(player), stack);
+        // Render with a copy so renderer-side mutation does not leak or desync other contexts.
+        ItemStack renderStack = original.copy();
+        disc.__setRGB(flyingItem.getColor(), renderStack);
 
         this.itemRenderer.renderItem(
-                stack,
+                renderStack,
                 ModelTransformationMode.FIXED,
                 light,
                 OverlayTexture.DEFAULT_UV,
