@@ -47,21 +47,61 @@ public class TrailRenderer {
             float a1 = fraction1 * trail.buffer[pre + 6];
             float a2 = fraction2 * trail.buffer[index + 6];
 
-            vertex(trail, lineVertexConsumer, matrix, 0, 0, pre, pos, a1, light, color);
-            vertex(trail, lineVertexConsumer, matrix, 0, 1, pre + 3, pos, a1, light, color);
-            vertex(trail, lineVertexConsumer, matrix, 1, 1, index + 3, pos, a2, light, color);
-            vertex(trail, lineVertexConsumer, matrix, 1, 0, index, pos, a2, light, color);
+            float dx = trail.buffer[index] - trail.buffer[pre];
+            float dz = trail.buffer[index + 2] - trail.buffer[pre + 2];
+            float len = (float) Math.sqrt(dx * dx + dz * dz);
+            float nx = 0, nz = 0;
+            if (len > 0.0001f) {
+                nx = -(dz / len) * 0.05f; // half of 0.1 thickness
+                nz = (dx / len) * 0.05f;
+            }
 
-            //todo the anti culling here is stupid
-            vertex(trail, lineVertexConsumer, matrix, 1, 0, index, pos, a2, light, color);
-            vertex(trail, lineVertexConsumer, matrix, 1, 1, index + 3, pos, a2, light, color);
-            vertex(trail, lineVertexConsumer, matrix, 0, 1, pre + 3, pos, a1, light, color);
-            vertex(trail, lineVertexConsumer, matrix, 0, 0, pre, pos, a1, light, color);
+            // Left side
+            vertex(trail, lineVertexConsumer, matrix, 0, 0, pre, pos, a1, light, color, nx, nz);
+            vertex(trail, lineVertexConsumer, matrix, 0, 1, pre + 3, pos, a1, light, color, nx, nz);
+            vertex(trail, lineVertexConsumer, matrix, 1, 1, index + 3, pos, a2, light, color, nx, nz);
+            vertex(trail, lineVertexConsumer, matrix, 1, 0, index, pos, a2, light, color, nx, nz);
+            
+            // Left side (inner face)
+            vertex(trail, lineVertexConsumer, matrix, 1, 0, index, pos, a2, light, color, nx, nz);
+            vertex(trail, lineVertexConsumer, matrix, 1, 1, index + 3, pos, a2, light, color, nx, nz);
+            vertex(trail, lineVertexConsumer, matrix, 0, 1, pre + 3, pos, a1, light, color, nx, nz);
+            vertex(trail, lineVertexConsumer, matrix, 0, 0, pre, pos, a1, light, color, nx, nz);
+
+            // Right side
+            vertex(trail, lineVertexConsumer, matrix, 1, 0, index, pos, a2, light, color, -nx, -nz);
+            vertex(trail, lineVertexConsumer, matrix, 1, 1, index + 3, pos, a2, light, color, -nx, -nz);
+            vertex(trail, lineVertexConsumer, matrix, 0, 1, pre + 3, pos, a1, light, color, -nx, -nz);
+            vertex(trail, lineVertexConsumer, matrix, 0, 0, pre, pos, a1, light, color, -nx, -nz);
+
+            // Top side
+            vertex(trail, lineVertexConsumer, matrix, 0, 0, pre + 3, pos, a1, light, color, nx, nz);
+            vertex(trail, lineVertexConsumer, matrix, 0, 1, pre + 3, pos, a1, light, color, -nx, -nz);
+            vertex(trail, lineVertexConsumer, matrix, 1, 1, index + 3, pos, a2, light, color, -nx, -nz);
+            vertex(trail, lineVertexConsumer, matrix, 1, 0, index + 3, pos, a2, light, color, nx, nz);
+
+            // Top side (Inner face)
+            vertex(trail, lineVertexConsumer, matrix, 0, 0, pre + 3, pos, a1, light, color, -nx, -nz);
+            vertex(trail, lineVertexConsumer, matrix, 0, 1, pre + 3, pos, a1, light, color, nx, nz);
+            vertex(trail, lineVertexConsumer, matrix, 1, 1, index + 3, pos, a2, light, color, nx, nz);
+            vertex(trail, lineVertexConsumer, matrix, 1, 0, index + 3, pos, a2, light, color, -nx, -nz);
+
+            // Bottom side
+            vertex(trail, lineVertexConsumer, matrix, 0, 0, pre, pos, a1, light, color, -nx, -nz);
+            vertex(trail, lineVertexConsumer, matrix, 0, 1, pre, pos, a1, light, color, nx, nz);
+            vertex(trail, lineVertexConsumer, matrix, 1, 1, index, pos, a2, light, color, nx, nz);
+            vertex(trail, lineVertexConsumer, matrix, 1, 0, index, pos, a2, light, color, -nx, -nz);
+
+            // Bottom side (Inner face)
+            vertex(trail, lineVertexConsumer, matrix, 0, 0, pre, pos, a1, light, color, nx, nz);
+            vertex(trail, lineVertexConsumer, matrix, 0, 1, pre, pos, a1, light, color, -nx, -nz);
+            vertex(trail, lineVertexConsumer, matrix, 1, 1, index, pos, a2, light, color, -nx, -nz);
+            vertex(trail, lineVertexConsumer, matrix, 1, 0, index, pos, a2, light, color, nx, nz);
         }
     }
 
-    private static void vertex(Trail trail, VertexConsumer lineVertexConsumer, Matrix3f matrix, float u, float v, int index, Vec3d pos, float a, int light, Vector3f color) {
-        Vector3f p = new Vector3f((float) (trail.buffer[index] - pos.x), (float) (trail.buffer[index + 1] - pos.y), (float) (trail.buffer[index + 2] - pos.z));
+    private static void vertex(Trail trail, VertexConsumer lineVertexConsumer, Matrix3f matrix, float u, float v, int index, Vec3d pos, float a, int light, Vector3f color, float ox, float oz) {
+        Vector3f p = new Vector3f((float) (trail.buffer[index] - pos.x) + ox, (float) (trail.buffer[index + 1] - pos.y), (float) (trail.buffer[index + 2] - pos.z) + oz);
         matrix.transform(p);
         
         // Multiply color by alpha for additive fading effect

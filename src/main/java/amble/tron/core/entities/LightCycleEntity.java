@@ -25,8 +25,20 @@ import java.util.LinkedList;
 public class LightCycleEntity extends LivingEntity {
     private static final TrackedData<Vector3f> FACTION_COLOR = DataTracker.registerData(LightCycleEntity.class, TrackedDataHandlerRegistry.VECTOR3F);
 
+    public static class TrailCollider {
+        public final Box box;
+        public int age;
+        public boolean canKill;
+        public TrailCollider(Box box) {
+            this.box = box;
+            this.age = 0;
+            this.canKill = false;
+        }
+    }
+
     public final Trail visualTrail = new Trail(512);
-    public final LinkedList<Box> serverTrailColliders = new LinkedList<>();
+    public final LinkedList<TrailCollider> serverTrailColliders = new LinkedList<>();
+    public final LinkedList<Vec3d> serverTrailPoints = new LinkedList<>();
 
     public LightCycleEntity(EntityType<? extends LivingEntity> type, World world) {
         super(type, world);
@@ -94,15 +106,33 @@ public class LightCycleEntity extends LivingEntity {
         }
 
         if (!this.getWorld().isClient()) {
-            if (this.getVelocity().lengthSquared() > 0.01) {
+            double speedSq = (this.getX() - this.prevX) * (this.getX() - this.prevX) + (this.getZ() - this.prevZ) * (this.getZ() - this.prevZ);
+
+            if (speedSq > 0.001 || this.getVelocity().lengthSquared() > 0.01) {
                 double yawRad = Math.toRadians(this.getYaw());
                 double backX = this.getX() + Math.sin(yawRad) * 1.5;
                 double backZ = this.getZ() - Math.cos(yawRad) * 1.5;
-                Box segmentBox = new Box(backX - 0.2, this.getY(), backZ - 0.2, backX + 0.2, this.getY() + 1.2, backZ + 0.2);
+                Vec3d curPoint = new Vec3d(backX, this.getY(), backZ);
 
-                this.serverTrailColliders.addFirst(segmentBox);
-                if (this.serverTrailColliders.size() > 512) {
-                    this.serverTrailColliders.removeLast();
+                if (!this.serverTrailPoints.isEmpty()) {
+                    Vec3d prevPoint = this.serverTrailPoints.getFirst();
+                    double minX = Math.min(prevPoint.x, curPoint.x) - 0.2;
+                    double maxX = Math.max(prevPoint.x, curPoint.x) + 0.2;
+                    double minY = Math.min(prevPoint.y, curPoint.y);
+                    double maxY = Math.max(prevPoint.y, curPoint.y) + 1.2;
+                    double minZ = Math.min(prevPoint.z, curPoint.z) - 0.2;
+                    double maxZ = Math.max(prevPoint.z, curPoint.z) + 0.2;
+                    Box segmentBox = new Box(minX, minY, minZ, maxX, maxY, maxZ);
+
+                    this.serverTrailColliders.addFirst(new TrailCollider(segmentBox));
+                    if (this.serverTrailColliders.size() > 512) {
+                        this.serverTrailColliders.removeLast();
+                    }
+                }
+
+                this.serverTrailPoints.addFirst(curPoint);
+                if (this.serverTrailPoints.size() > 513) {
+                    this.serverTrailPoints.removeLast();
                 }
             }
 
@@ -110,11 +140,11 @@ public class LightCycleEntity extends LivingEntity {
             boolean collided = false;
 
             // Check against other cycles using an expansion matching max trail distance to catch far away cycles.
-            java.util.List<LightCycleEntity> cycles = this.getWorld().getEntitiesByClass(LightCycleEntity.class, myBox.expand(512.0), e -> true);
+            java.util.List<LightCycleEntity> cycles = this.getWorld().getEntitiesByClass(LightCycleEntity.class, myBox.expand(256.0), e -> true);
             for (LightCycleEntity otherCycle : cycles) {
                 if (otherCycle == this) continue;
-                for (Box collider : otherCycle.serverTrailColliders) {
-                    if (myBox.intersects(collider)) {
+                for (TrailCollider collider : otherCycle.serverTrailColliders) {
+                    if (myBox.intersects(collider.box)) {
                         collided = true;
                         break;
                     }
@@ -122,12 +152,24 @@ public class LightCycleEntity extends LivingEntity {
                 if (collided) break;
             }
 
-            // Check against self (skip most recent to prevent instant self-destruction)
+            // Check against self using the canKill flag or age to prevent instant self-destruction from the tail
             if (!collided) {
-                int skip = 15;
-                for (Box collider : this.serverTrailColliders) {
-                    if (skip-- > 0) continue;
-                    if (myBox.intersects(collider)) {
+                for (TrailCollider collider : this.serverTrailColliders) {
+                    collider.age++;
+
+                    // Activate canKill if it has existed long enough or the cycle has moved far enough away
+                    if (!collider.canKill) {
+                        double boxCenterX = (collider.box.minX + collider.box.maxX) / 2.0;
+                        double boxCenterZ = (collider.box.minZ + collider.box.maxZ) / 2.0;
+                        double distSq = (this.getX() - boxCenterX) * (this.getX() - boxCenterX) + (this.getZ() - boxCenterZ) * (this.getZ() - boxCenterZ);
+
+                        // Age > 15 ticks or distance > 3 blocks
+                        if (collider.age > 15 || distSq > 9.0) {
+                            collider.canKill = true;
+                        }
+                    }
+
+                    if (collider.canKill && myBox.intersects(collider.box)) {
                         collided = true;
                         break;
                     }
@@ -389,4 +431,3 @@ public class LightCycleEntity extends LivingEntity {
         this.lastTrailSegmentPos = new Vec3d(backX, y, backZ);
     }
 }
-
