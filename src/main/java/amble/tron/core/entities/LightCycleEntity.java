@@ -18,6 +18,7 @@ import net.minecraft.util.Arm;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.*;
 import net.minecraft.world.World;
+import net.minecraft.block.BlockState;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -33,16 +34,19 @@ public class LightCycleEntity extends LivingEntity {
         public final Box box;
         public int age;
         public boolean canKill;
-        public TrailCollider(Box box) {
+        public final int segmentIndex;
+        public TrailCollider(Box box, int segmentIndex) {
             this.box = box;
             this.age = 0;
             this.canKill = false;
+            this.segmentIndex = segmentIndex;
         }
     }
 
     public final Trail visualTrail = new Trail(512);
     public final LinkedList<TrailCollider> serverTrailColliders = new LinkedList<>();
     public final LinkedList<Vec3d> serverTrailPoints = new LinkedList<>();
+    private int trailSegmentCounter = 0;
 
     public float tilt = 0.0f;
     public float prevTilt = 0.0f;
@@ -51,7 +55,7 @@ public class LightCycleEntity extends LivingEntity {
 
     @Override
     public double getMountedHeightOffset() {
-        return super.getMountedHeightOffset() - 0.75; // Lower the camera
+        return super.getMountedHeightOffset() - 0.75; // Adjusted for proper seat positioning
     }
 
     public LightCycleEntity(EntityType<? extends LivingEntity> entityType, World world) {
@@ -165,7 +169,7 @@ public class LightCycleEntity extends LivingEntity {
                     double maxZ = Math.max(prevPoint.z, curPoint.z) + 0.2;
                     Box segmentBox = new Box(minX, minY, minZ, maxX, maxY, maxZ);
 
-                    this.serverTrailColliders.addFirst(new TrailCollider(segmentBox));
+                    this.serverTrailColliders.addFirst(new TrailCollider(segmentBox, this.trailSegmentCounter++));
                     if (this.serverTrailColliders.size() > 512) {
                         this.serverTrailColliders.removeLast();
                     }
@@ -177,6 +181,7 @@ public class LightCycleEntity extends LivingEntity {
                 }
             }
 
+            // Client-side canKill logic for visual prediction (matches server logic)
             for (TrailCollider collider : this.serverTrailColliders) {
                 collider.age++;
                 if (!collider.canKill) {
@@ -184,7 +189,7 @@ public class LightCycleEntity extends LivingEntity {
                     double boxCenterZ = (collider.box.minZ + collider.box.maxZ) / 2.0;
                     double distSq = (this.getX() - boxCenterX) * (this.getX() - boxCenterX) + (this.getZ() - boxCenterZ) * (this.getZ() - boxCenterZ);
 
-                    if (collider.age > 8 || distSq > 2.25) {
+                    if (collider.age > 4 || distSq > 0.8) {
                         collider.canKill = true;
                     }
                 }
@@ -195,19 +200,15 @@ public class LightCycleEntity extends LivingEntity {
         if (!this.getWorld().isClient()) {
             Vec3d backPos = new Vec3d(this.getX() + Math.sin(Math.toRadians(this.getYaw())) * 1.5, this.getY(), this.getZ() - Math.cos(Math.toRadians(this.getYaw())) * 1.5);
 
-            Box myBox = this.getBoundingBox();
-            Box sweptBox = myBox.union(new Box(this.prevX - this.getWidth()/2, this.prevY, this.prevZ - this.getWidth()/2, this.prevX + this.getWidth()/2, this.prevY + this.getHeight(), this.prevZ + this.getWidth()/2));
-
-            boolean collided = false;
-
+            // Clear colliders when beam is not active
             if (!this.isBeamActive()) {
                 this.serverTrailPoints.clear();
                 this.serverTrailColliders.clear();
             }
 
+            // Create collision boxes (matching logic from working commit fdf8da5)
             boolean shouldAddBox = false;
-            double speedSqS = (this.getX() - this.prevX) * (this.getX() - this.prevX) + (this.getZ() - this.prevZ) * (this.getZ() - this.prevZ);
-            if ((speedSqS > 0.001 || this.getVelocity().lengthSquared() > 0.01) && this.isBeamActive()) {
+            if (this.isBeamActive()) {
                 if (this.serverTrailPoints.isEmpty()) {
                     shouldAddBox = true;
                 } else {
@@ -229,7 +230,7 @@ public class LightCycleEntity extends LivingEntity {
                     double maxZ = Math.max(prevPoint.z, backPos.z) + 0.2;
                     Box segmentBox = new Box(minX, minY, minZ, maxX, maxY, maxZ);
 
-                    this.serverTrailColliders.addFirst(new TrailCollider(segmentBox));
+                    this.serverTrailColliders.addFirst(new TrailCollider(segmentBox, this.trailSegmentCounter++));
                     if (this.serverTrailColliders.size() > 512) {
                         this.serverTrailColliders.removeLast();
                     }
@@ -241,6 +242,11 @@ public class LightCycleEntity extends LivingEntity {
                 }
             }
 
+            Box myBox = this.getBoundingBox();
+            Box sweptBox = myBox.union(new Box(this.prevX - this.getWidth()/2, this.prevY, this.prevZ - this.getWidth()/2, this.prevX + this.getWidth()/2, this.prevY + this.getHeight(), this.prevZ + this.getWidth()/2));
+
+            boolean collided = false;
+
             // Kill any entities touching our beam
             for (TrailCollider collider : this.serverTrailColliders) {
                 collider.age++;
@@ -249,8 +255,8 @@ public class LightCycleEntity extends LivingEntity {
                     double boxCenterZ = (collider.box.minZ + collider.box.maxZ) / 2.0;
                     double distSq = (this.getX() - boxCenterX) * (this.getX() - boxCenterX) + (this.getZ() - boxCenterZ) * (this.getZ() - boxCenterZ);
 
-                    // Drop threshold drastically: 4 ticks or distance > 1.2 blocks to allow sharp turns to kill you
-                    if (collider.age > 4 || distSq > 1.8) {
+                    // Age > 4 ticks OR distance > 0.8 blocks squared (from working commit)
+                    if (collider.age > 4 || distSq > 0.8) {
                         collider.canKill = true;
                     }
                 }
@@ -279,7 +285,7 @@ public class LightCycleEntity extends LivingEntity {
                 this.kill();
             }
 
-            // Check against other cycles' beams (just in case they haven't processed yet)
+            // Check against other cycles' beams
             java.util.List<LightCycleEntity> cycles = this.getWorld().getEntitiesByClass(LightCycleEntity.class, myBox.expand(256.0), e -> true);
             for (LightCycleEntity otherCycle : cycles) {
                 if (otherCycle == this) continue;
@@ -372,16 +378,26 @@ public class LightCycleEntity extends LivingEntity {
             }
 
             // Step-up check: if grounded and moving into a low obstacle, try to step up one block
-            if (this.isOnGround() && horiz > 1.0E-5) {
-                double nextX = this.getX() + Math.signum(vel.x) * Math.min(Math.abs(vel.x), 0.5);
-                double nextZ = this.getZ() + Math.signum(vel.z) * Math.min(Math.abs(vel.z), 0.5);
-                BlockPos aheadPos = new BlockPos.Mutable(nextX, this.getY(), nextZ);
-                boolean blockAtFeet = !this.getWorld().getBlockState(aheadPos).isAir();
-                boolean spaceAbove = this.getWorld().getBlockState(aheadPos.up()).isAir();
-                boolean headSpaceAbove2 = this.getWorld().getBlockState(aheadPos.up(2)).isAir();
-                if (blockAtFeet && spaceAbove && headSpaceAbove2) {
-                    // nudge upward to step up
-                    vel = new Vec3d(vel.x, 0.9, vel.z);
+            if (this.isOnGround() && horiz > 0.01) {
+                // Look ahead in the direction of travel using yaw, not velocity components
+                double lookAhead = Math.max(0.6, horiz * 2);
+                double nextX = this.getX() - Math.sin(yawRad) * lookAhead;
+                double nextZ = this.getZ() + Math.cos(yawRad) * lookAhead;
+
+                BlockPos aheadPos = BlockPos.ofFloored(nextX, this.getY(), nextZ);
+                BlockState blockAtFeet = this.getWorld().getBlockState(aheadPos);
+                BlockState blockAbove = this.getWorld().getBlockState(aheadPos.up());
+                BlockState blockAbove2 = this.getWorld().getBlockState(aheadPos.up(2));
+
+                // Check if there's a solid obstacle we can step onto
+                boolean hasObstacle = blockAtFeet.isSolidBlock(this.getWorld(), aheadPos);
+                boolean hasHeadroom = !blockAbove.isSolidBlock(this.getWorld(), aheadPos.up())
+                                   && !blockAbove2.isSolidBlock(this.getWorld(), aheadPos.up(2));
+
+                if (hasObstacle && hasHeadroom) {
+                    // Teleport up smoothly rather than applying velocity
+                    this.setPosition(this.getX(), this.getY() + 1.0, this.getZ());
+                    vel = new Vec3d(vel.x, 0.0, vel.z);
                 }
             }
 

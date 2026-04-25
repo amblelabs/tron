@@ -498,34 +498,38 @@ public class LightCycleModel extends EntityModel<LightCycleEntity> {
 	}
 
 	public static void transformMixinModel(PlayerEntityModel playerEntityModel) {
-		playerEntityModel.body.pivotZ -= 13;
-		playerEntityModel.jacket.pivotZ -= 13;
+		float seatZ = -12f;
+		float seatY = -4f;
 
-		playerEntityModel.head.pivotZ -= 13;
-		playerEntityModel.hat.pivotZ -= 13;
+		playerEntityModel.body.pivotZ = seatZ;
+		playerEntityModel.jacket.pivotZ = seatZ;
+		playerEntityModel.head.pivotZ = seatZ;
+		playerEntityModel.hat.pivotZ = seatZ;
 
-		playerEntityModel.leftArm.pivotZ -= 13;
-		playerEntityModel.leftSleeve.pivotZ -= 13;
+		playerEntityModel.leftArm.pivotZ = seatZ;
+		playerEntityModel.leftSleeve.pivotZ = seatZ;
+		playerEntityModel.rightArm.pivotZ = seatZ;
+		playerEntityModel.rightSleeve.pivotZ = seatZ;
 
-		playerEntityModel.rightArm.pivotZ -= 13;
-		playerEntityModel.rightSleeve.pivotZ -= 13;
+		playerEntityModel.body.pivotY = seatY;
+		playerEntityModel.jacket.pivotY = seatY;
+		playerEntityModel.head.pivotY = seatY;
+		playerEntityModel.hat.pivotY = seatY;
 
-		/*playerEntityModel.body.pivotY += 10;
-		playerEntityModel.jacket.pivotY += 10;
+		playerEntityModel.leftArm.pivotY = seatY;
+		playerEntityModel.leftSleeve.pivotY = seatY;
+		playerEntityModel.rightArm.pivotY = seatY;
+		playerEntityModel.rightSleeve.pivotY = seatY;
 
-		playerEntityModel.head.pivotY += 10;
-		playerEntityModel.hat.pivotY += 10;
+		playerEntityModel.leftLeg.pivotZ = 0f;
+		playerEntityModel.leftPants.pivotZ = 0f;
+		playerEntityModel.rightLeg.pivotZ = 0f;
+		playerEntityModel.rightPants.pivotZ = 0f;
 
-		playerEntityModel.leftArm.pivotY += 10;
-		playerEntityModel.leftSleeve.pivotY += 10;
-
-		playerEntityModel.rightArm.pivotY += 10;
-		playerEntityModel.rightSleeve.pivotY += 10;*/
-
-		playerEntityModel.leftLeg.pivotY -= 10;
-		playerEntityModel.leftPants.pivotY -= 10;
-		playerEntityModel.rightLeg.pivotY -= 10;
-		playerEntityModel.rightPants.pivotY -= 10;
+		playerEntityModel.leftLeg.pivotY = 0f;
+		playerEntityModel.leftPants.pivotY = 0f;
+		playerEntityModel.rightLeg.pivotY = 0f;
+		playerEntityModel.rightPants.pivotY = 0f;
 	}
 }
 
