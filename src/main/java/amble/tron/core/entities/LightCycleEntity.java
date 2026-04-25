@@ -1,7 +1,10 @@
 package amble.tron.core.entities;
 
+import amble.tron.client.sound.LightCycleMovingSoundInstance;
 import amble.tron.core.entities.lighttrail.Trail;
 import amble.tron.core.TronAttachmentUtil;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.sound.SoundManager;
 import net.minecraft.entity.*;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -102,6 +105,8 @@ public class LightCycleEntity extends LivingEntity {
         this.dataTracker.set(FACTION_COLOR, color);
     }
 
+    private LightCycleMovingSoundInstance movingInstance;
+
     @Override
     public void tick() {
         super.tick();
@@ -133,6 +138,18 @@ public class LightCycleEntity extends LivingEntity {
             // Trail disappears if not moving fast enough or beam is toggled off
             float alpha = ((this.getVelocity().lengthSquared() > 0.01 || speedSq > 0.001) && this.isBeamActive()) ? 1.0f : 0.0f;
             this.visualTrail.add(v1, v2, alpha);
+
+            SoundManager soundManager = MinecraftClient.getInstance().getSoundManager();
+
+            if (speedSq > 0.001 || this.getVelocity().lengthSquared() > 0.01) {
+                if (this.movingInstance == null || !soundManager.isPlaying(this.movingInstance)) {
+                    this.movingInstance = new LightCycleMovingSoundInstance(this);
+                    soundManager.play(this.movingInstance);
+                }
+            } else if (this.movingInstance != null && soundManager.isPlaying(this.movingInstance)) {
+                soundManager.stop(this.movingInstance);
+                this.movingInstance = null;
+            }
             
             // Client-side physics colliders for prediction
             if ((speedSq > 0.001 || this.getVelocity().lengthSquared() > 0.01) && this.isBeamActive()) {
