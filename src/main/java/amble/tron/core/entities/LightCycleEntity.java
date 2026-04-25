@@ -24,6 +24,7 @@ import java.util.LinkedList;
 
 public class LightCycleEntity extends LivingEntity {
     private static final TrackedData<Vector3f> FACTION_COLOR = DataTracker.registerData(LightCycleEntity.class, TrackedDataHandlerRegistry.VECTOR3F);
+    private static final TrackedData<Boolean> BEAM_ACTIVE = DataTracker.registerData(LightCycleEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
 
     public static class TrailCollider {
         public final Box box;
@@ -47,7 +48,7 @@ public class LightCycleEntity extends LivingEntity {
 
     @Override
     public double getMountedHeightOffset() {
-        return super.getMountedHeightOffset() - 0.7; // Lower the camera
+        return super.getMountedHeightOffset() - 0.75; // Lower the camera
     }
 
     public LightCycleEntity(EntityType<? extends LivingEntity> entityType, World world) {
@@ -82,6 +83,15 @@ public class LightCycleEntity extends LivingEntity {
     protected void initDataTracker() {
         super.initDataTracker();
         this.dataTracker.startTracking(FACTION_COLOR, new Vector3f(1.0f, 1.0f, 1.0f));
+        this.dataTracker.startTracking(BEAM_ACTIVE, false);
+    }
+
+    public boolean isBeamActive() {
+        return this.dataTracker.get(BEAM_ACTIVE);
+    }
+
+    public void setBeamActive(boolean flag) {
+        this.dataTracker.set(BEAM_ACTIVE, flag);
     }
 
     public Vector3f getColor() {
@@ -120,12 +130,12 @@ public class LightCycleEntity extends LivingEntity {
             Vector4f v2 = new Vector4f((float) (backX + upX * 1.1), (float) (y + upY * 1.1), (float) (backZ + upZ * 1.1), 1.0f);
 
             double speedSq = (this.getX() - this.prevX) * (this.getX() - this.prevX) + (this.getZ() - this.prevZ) * (this.getZ() - this.prevZ);
-            // Trail disappears if not moving fast enough
-            float alpha = (this.getVelocity().lengthSquared() > 0.01 || speedSq > 0.001) ? 1.0f : 0.0f;
+            // Trail disappears if not moving fast enough or beam is toggled off
+            float alpha = ((this.getVelocity().lengthSquared() > 0.01 || speedSq > 0.001) && this.isBeamActive()) ? 1.0f : 0.0f;
             this.visualTrail.add(v1, v2, alpha);
             
             // Client-side physics colliders for prediction
-            if (speedSq > 0.001 || this.getVelocity().lengthSquared() > 0.01) {
+            if ((speedSq > 0.001 || this.getVelocity().lengthSquared() > 0.01) && this.isBeamActive()) {
                 Vec3d curPoint = new Vec3d(backX, this.getY(), backZ);
 
                 if (!this.serverTrailPoints.isEmpty()) {
@@ -168,13 +178,26 @@ public class LightCycleEntity extends LivingEntity {
         if (!this.getWorld().isClient()) {
             Vec3d backPos = new Vec3d(this.getX() + Math.sin(Math.toRadians(this.getYaw())) * 1.5, this.getY(), this.getZ() - Math.cos(Math.toRadians(this.getYaw())) * 1.5);
 
+            Box myBox = this.getBoundingBox();
+            Box sweptBox = myBox.union(new Box(this.prevX - this.getWidth()/2, this.prevY, this.prevZ - this.getWidth()/2, this.prevX + this.getWidth()/2, this.prevY + this.getHeight(), this.prevZ + this.getWidth()/2));
+
+            boolean collided = false;
+
+            if (!this.isBeamActive()) {
+                this.serverTrailPoints.clear();
+                this.serverTrailColliders.clear();
+            }
+
             boolean shouldAddBox = false;
-            if (this.serverTrailPoints.isEmpty()) {
-                shouldAddBox = true;
-            } else {
-                Vec3d lastPoint = this.serverTrailPoints.getFirst();
-                if (lastPoint.squaredDistanceTo(backPos) > 0.05) {
+            double speedSqS = (this.getX() - this.prevX) * (this.getX() - this.prevX) + (this.getZ() - this.prevZ) * (this.getZ() - this.prevZ);
+            if ((speedSqS > 0.001 || this.getVelocity().lengthSquared() > 0.01) && this.isBeamActive()) {
+                if (this.serverTrailPoints.isEmpty()) {
                     shouldAddBox = true;
+                } else {
+                    Vec3d lastPoint = this.serverTrailPoints.getFirst();
+                    if (lastPoint.squaredDistanceTo(backPos) > 0.05) {
+                        shouldAddBox = true;
+                    }
                 }
             }
 
@@ -201,11 +224,6 @@ public class LightCycleEntity extends LivingEntity {
                 }
             }
 
-            Box myBox = this.getBoundingBox();
-            Box sweptBox = myBox.union(new Box(this.prevX - this.getWidth()/2, this.prevY, this.prevZ - this.getWidth()/2, this.prevX + this.getWidth()/2, this.prevY + this.getHeight(), this.prevZ + this.getWidth()/2));
-
-            boolean collided = false;
-
             // Kill any entities touching our beam
             for (TrailCollider collider : this.serverTrailColliders) {
                 collider.age++;
@@ -214,8 +232,8 @@ public class LightCycleEntity extends LivingEntity {
                     double boxCenterZ = (collider.box.minZ + collider.box.maxZ) / 2.0;
                     double distSq = (this.getX() - boxCenterX) * (this.getX() - boxCenterX) + (this.getZ() - boxCenterZ) * (this.getZ() - boxCenterZ);
 
-                    // Drop threshold drastically: 4 ticks or distance > 0.8 blocks to allow sharp turns to kill you
-                    if (collider.age > 4 || distSq > 0.8) {
+                    // Drop threshold drastically: 4 ticks or distance > 1.2 blocks to allow sharp turns to kill you
+                    if (collider.age > 4 || distSq > 1.8) {
                         collider.canKill = true;
                     }
                 }
@@ -264,7 +282,7 @@ public class LightCycleEntity extends LivingEntity {
                 this.setColor(factionColor);
             }
 
-            if (player.getMainHandStack().getItem() instanceof SwordItem) {
+            if (this.isBeamActive()) {
                 this.spawnTrailIfNeeded();
             }
         }
@@ -296,20 +314,9 @@ public class LightCycleEntity extends LivingEntity {
         if (canTurn) {
             this.setYaw(clampedYaw);
 
-            // Do not force the player to match the vehicle yaw exactly.
-            // Instead, lock the player's yaw to remain within \u00B1maxRange of the vehicle's yaw.
+            // Update the player's yaw to turn exactly with the bike
             float playerYaw = controllingPlayer.getYaw();
-            float playerDiff = MathHelper.wrapDegrees(playerYaw - this.getYaw());
-            if (playerDiff < -maxRange) {
-                playerYaw = this.getYaw() - maxRange;
-            } else if (playerDiff > maxRange) {
-                playerYaw = this.getYaw() + maxRange;
-            }
-
-            // Only update the player's yaw if it was outside the allowed range
-            if (Math.abs(MathHelper.wrapDegrees(playerYaw - controllingPlayer.getYaw())) > 1.0E-4F) {
-                controllingPlayer.setYaw(playerYaw);
-            }
+            controllingPlayer.setYaw(playerYaw + steer);
         }
 
         Vec2f rot = this.getControlledRotation(controllingPlayer);

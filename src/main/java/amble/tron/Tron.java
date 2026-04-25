@@ -8,6 +8,7 @@ import net.fabricmc.api.ModInitializer;
 
 import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -31,6 +32,7 @@ public class Tron implements ModInitializer {
         RegistryContainer.register(TronItems.class, MOD_ID);
         RegistryContainer.register(TronEntities.class, MOD_ID);
         TronAttachmentTypes.init();
+        TronSounds.init();
         CommandRegistrationCallback.EVENT.register(((commandDispatcher, commandRegistryAccess, registrationEnvironment) -> {
             FactionColorCommand.register(commandDispatcher);
         }));
@@ -46,6 +48,14 @@ public class Tron implements ModInitializer {
         ServerPlayConnectionEvents.JOIN.register((serverPlayNetworkHandler, packetSender, server) -> {
             ServerPlayerEntity player = serverPlayNetworkHandler.getPlayer();
             TronAttachmentUtil.setInitialPlayerFaction(player);
+        });
+
+        ServerPlayNetworking.registerGlobalReceiver(Tron.of("toggle_beam"), (server, player, handler, buf, responseSender) -> {
+            server.execute(() -> {
+                if (player.getVehicle() instanceof LightCycleEntity cycle) {
+                    cycle.setBeamActive(!cycle.isBeamActive());
+                }
+            });
         });
     }
 

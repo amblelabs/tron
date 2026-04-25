@@ -2,6 +2,7 @@ package amble.tron.client.features;
 
 import amble.tron.core.TronAttachmentTypes;
 import amble.tron.core.TronAttachmentUtil;
+import amble.tron.core.entities.LightCycleEntity;
 import amble.tron.core.items.LightSuitItem;
 import amble.tron.Tron;
 import amble.tron.core.items.IdentityDiscItem;
@@ -29,6 +30,7 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
             FeatureRenderer<T, M> {
 
     public static final Identifier LIGHTSUIT_TEXTURE = new Identifier(Tron.MOD_ID, "textures/entity/lightsuit.png");
+    public static final Identifier CYCLE_SUIT = new Identifier(Tron.MOD_ID, "textures/entity/cyclesuit.png");
     public static final Identifier LIGHTSUIT_LIGHTS = new Identifier(Tron.MOD_ID, "textures/entity/lightsuit_emission.png");
 
     private final M model;
@@ -46,16 +48,6 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
             return;
 
         matrixStack.push();
-
-        // god bless america
-        /*for (BodyParts part : BodyParts.values()) {
-            ItemStack stack = getModelForSlot(livingEntity, part);
-            if (stack.getItem() instanceof LightSuitItem) {
-                enablePart(this.model, part);
-            } else {
-                disablePart(this.model, part);
-            }
-        }*/
 
         ItemStack stack = livingEntity.getEquippedStack(EquipmentSlot.CHEST);
 
@@ -88,7 +80,8 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
         this.model.rightPants.copyTransform(getContextModel().rightPants);
 
         if (bl) {
-            this.model.render(matrixStack, vertexConsumerProvider.getBuffer(RenderLayer.getEntityTranslucent(LIGHTSUIT_TEXTURE)), i, OverlayTexture.DEFAULT_UV, 1, 1, 1, 1f);
+            this.model.render(matrixStack, vertexConsumerProvider.getBuffer(RenderLayer.getEntityTranslucent(livingEntity.getVehicle() instanceof LightCycleEntity
+                    ? CYCLE_SUIT : LIGHTSUIT_TEXTURE)), i, OverlayTexture.DEFAULT_UV, 1, 1, 1, 1f);
         }
 
         Vector3f defaultProgram = new Vector3f(0.5f, 0.7f, 1.0f);

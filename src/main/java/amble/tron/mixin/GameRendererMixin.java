@@ -16,7 +16,7 @@ public class GameRendererMixin {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player != null && client.player.getVehicle() instanceof LightCycleEntity cycle) {
             float currentTilt = MathHelper.lerp(tickDelta, cycle.prevTilt, cycle.tilt);
-            matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-currentTilt));
+            matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-currentTilt * 0.4f));
         }
     }
 }
