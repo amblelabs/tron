@@ -22,8 +22,8 @@ public class TrailRenderer {
             return;
         }
 
-        VertexConsumer lineVertexConsumer = vertexConsumerProvider.getBuffer(RenderLayer.getEyes(identifier));
-        int light = 15728640;
+        VertexConsumer lineVertexConsumer = vertexConsumerProvider.getBuffer(RenderLayer.getBeaconBeam(identifier, true));
+        int light = 0xf000f0;
 
         Vec3d pos = MinecraftClient.getInstance().gameRenderer.getCamera().getPos();
         Matrix3f matrix = matrices.getNormalMatrix();
@@ -105,10 +105,10 @@ public class TrailRenderer {
         matrix.transform(p);
         
         // Multiply color by alpha for additive fading effect
-        float r = color.x * a;
-        float g = color.y * a;
-        float b = color.z * a;
+        float r = color.x + color.x;
+        float g = color.y * color.y;
+        float b = color.z * color.z;
         
-        lineVertexConsumer.vertex(p.x, p.y, p.z, r, g, b, 1.0f, u, v, OverlayTexture.DEFAULT_UV, light, 1, 0, 0);
+        lineVertexConsumer.vertex(p.x, p.y, p.z, r, g, b, a, u, v, OverlayTexture.DEFAULT_UV, light, 1, 0, 0);
     }
 }
