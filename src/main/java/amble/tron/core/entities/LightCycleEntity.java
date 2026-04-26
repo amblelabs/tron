@@ -53,6 +53,10 @@ public class LightCycleEntity extends LivingEntity {
 
     private boolean boosting = false;
 
+    // Smooth turning with momentum
+    private float yawVelocity = 0.0f;
+    private float targetSteer = 0.0f;
+
     @Override
     public double getMountedHeightOffset() {
         return super.getMountedHeightOffset() - 0.75; // Adjusted for proper seat positioning
@@ -314,32 +318,50 @@ public class LightCycleEntity extends LivingEntity {
     protected void tickControlled(PlayerEntity controllingPlayer, Vec3d movementInput) {
         super.tickControlled(controllingPlayer, movementInput);
 
-        // Only allow steering when moving forward
         float forwardInput = controllingPlayer.forwardSpeed;
-        boolean canTurn = forwardInput > 1.0E-4F;
+        float sidewaysInput = controllingPlayer.sidewaysSpeed;
+        boolean isBraking = forwardInput < -0.1F;
+        boolean isAccelerating = forwardInput > 0.1F;
 
-        float steer = 0.0F;
-        if (canTurn) {
-            steer = -controllingPlayer.sidewaysSpeed * 3.0F; // turn sensitivity (reduced)
+        // Calculate current speed for turn rate scaling
+        Vec3d currentVel = this.getVelocity();
+        double currentSpeed = Math.sqrt(currentVel.x * currentVel.x + currentVel.z * currentVel.z);
+
+        // Smooth steering with momentum - target steer based on input
+        float maxTurnRate = 4.0F; // Maximum degrees per tick the bike can turn
+        float turnAccel = 0.4F;   // How quickly yaw velocity changes
+
+        // Only allow steering when moving
+        if (currentSpeed > 0.02) {
+            // Target steering angle based on sideways input
+            this.targetSteer = -sidewaysInput * maxTurnRate;
+        } else {
+            this.targetSteer = 0.0F;
         }
 
-        // Clamp yaw within a left/right range relative to the controller's facing
-        float maxRange = 45.0F; // degrees allowed left/right from controller's yaw
-        float targetYaw = this.getYaw() + steer;
-        float centerYaw = controllingPlayer.getYaw();
+        // Smoothly interpolate yaw velocity toward target (momentum)
+        this.yawVelocity = MathHelper.lerp(turnAccel, this.yawVelocity, this.targetSteer);
 
-        // Compute shortest angular difference and clamp it
-        float diff = MathHelper.wrapDegrees(targetYaw - centerYaw);
+        // Clamp yaw velocity to prevent snapping
+        this.yawVelocity = MathHelper.clamp(this.yawVelocity, -maxTurnRate, maxTurnRate);
+
+        // Apply yaw velocity to bike yaw
+        float newYaw = this.getYaw() + this.yawVelocity;
+
+        // Clamp yaw within range relative to controller's facing
+        float maxRange = 45.0F;
+        float centerYaw = controllingPlayer.getYaw();
+        float diff = MathHelper.wrapDegrees(newYaw - centerYaw);
         if (diff < -maxRange) diff = -maxRange;
         if (diff > maxRange) diff = maxRange;
         float clampedYaw = centerYaw + diff;
 
-        if (canTurn) {
-            this.setYaw(clampedYaw);
+        this.setYaw(clampedYaw);
 
-            // Update the player's yaw to turn exactly with the bike
-            float playerYaw = controllingPlayer.getYaw();
-            controllingPlayer.setYaw(playerYaw + steer);
+        // Update player's yaw to follow the bike smoothly
+        float playerYawDiff = MathHelper.wrapDegrees(this.getYaw() - controllingPlayer.getYaw());
+        if (Math.abs(playerYawDiff) > 5.0F) {
+            controllingPlayer.setYaw(controllingPlayer.getYaw() + playerYawDiff * 0.15F);
         }
 
         Vec2f rot = this.getControlledRotation(controllingPlayer);
@@ -358,15 +380,32 @@ public class LightCycleEntity extends LivingEntity {
             // Update velocity based on thrust
             Vec3d vel = this.getVelocity().add(ax, 0.0, az);
 
-            // Apply stronger friction to reduce sliding
-            vel = new Vec3d(vel.x * 0.95, vel.y, vel.z * 0.95);
+            // Apply friction (stronger when braking)
+            double friction = isBraking ? 0.90 : 0.95;
+            vel = new Vec3d(vel.x * friction, vel.y, vel.z * friction);
 
-            // Reduce lateral sliding by damping the rightward component in local space
+            // Calculate lateral and forward components in local space
             Vec3d fwdVec = new Vec3d(-Math.sin(yawRad), 0.0, Math.cos(yawRad));
             Vec3d rightVec = new Vec3d(Math.cos(yawRad), 0.0, Math.sin(yawRad));
             double forwardComp = vel.dotProduct(fwdVec);
             double rightComp = vel.dotProduct(rightVec);
-            rightComp *= 0.5; // stronger damping on sideways velocity
+
+            // Skidding: when turning hard while braking or at high speed, reduce grip
+            boolean isTurningHard = Math.abs(this.yawVelocity) > maxTurnRate * 0.5F;
+            double lateralDamping;
+
+            if (isBraking && isTurningHard) {
+                // Skid! Less lateral grip, slide sideways
+                lateralDamping = 0.85;
+            } else if (isTurningHard && currentSpeed > 0.5) {
+                // High-speed turn, slight drift
+                lateralDamping = 0.7;
+            } else {
+                // Normal grip
+                lateralDamping = 0.5;
+            }
+
+            rightComp *= lateralDamping;
             vel = fwdVec.multiply(forwardComp).add(rightVec.multiply(rightComp)).add(new Vec3d(0.0, vel.y, 0.0));
 
             double maxSpeed = 0.8;
