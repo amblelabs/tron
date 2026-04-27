@@ -6,7 +6,6 @@ import amble.tron.core.entities.LightCycleEntity;
 import dev.amble.lib.container.RegistryContainer;
 import net.fabricmc.api.ModInitializer;
 
-import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -15,8 +14,6 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Map;
 
 public class Tron implements ModInitializer {
 	public static final String MOD_ID = "tron";
@@ -55,6 +52,16 @@ public class Tron implements ModInitializer {
                 if (player.getVehicle() instanceof LightCycleEntity cycle) {
                     cycle.setBeamActive(!cycle.isBeamActive());
                 }
+            });
+        });
+
+        ServerPlayNetworking.registerGlobalReceiver(Tron.of("recall_baton"), (server, player, handler, buf, responseSender) -> {
+            server.execute(() -> {
+                if (!(player.getVehicle() instanceof LightCycleEntity cycle) || cycle.isDying()) {
+                    return;
+                }
+
+                cycle.beginRecallAnimation(player);
             });
         });
     }

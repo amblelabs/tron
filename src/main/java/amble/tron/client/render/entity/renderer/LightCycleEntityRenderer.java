@@ -22,10 +22,16 @@ public class LightCycleEntityRenderer<T extends LightCycleEntity> extends Entity
 
     @Override
     public void render(T entity, float yaw, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
-        float spawnProgress = entity.getSpawnProgress(tickDelta);
-        float lineAlpha = net.minecraft.util.math.MathHelper.clamp(1.0f - spawnProgress * 3.0f, 0.0f, 1.0f);
-        float quadAlpha = net.minecraft.util.math.MathHelper.clamp(1.0f - Math.abs(spawnProgress * 3.0f - 1.0f), 0.0f, 1.0f);
-        float modelAlpha = net.minecraft.util.math.MathHelper.clamp(spawnProgress * 3.0f - 2.0f, 0.0f, 1.0f);
+        if (entity.isInvisible()) {
+            return;
+        }
+
+        float phaseProgress = entity.isDying()
+                ? (1.0f - entity.getDeathProgress(tickDelta))
+                : entity.getSpawnProgress(tickDelta);
+        float lineAlpha = net.minecraft.util.math.MathHelper.clamp(1.0f - phaseProgress * 3.0f, 0.0f, 1.0f);
+        float quadAlpha = net.minecraft.util.math.MathHelper.clamp(1.0f - Math.abs(phaseProgress * 3.0f - 1.0f), 0.0f, 1.0f);
+        float modelAlpha = net.minecraft.util.math.MathHelper.clamp(phaseProgress * 3.0f - 2.0f, 0.0f, 1.0f);
 
         matrices.push();
         matrices.multiply(RotationAxis.NEGATIVE_Y.rotationDegrees(yaw));
@@ -60,7 +66,7 @@ public class LightCycleEntityRenderer<T extends LightCycleEntity> extends Entity
 
     @Override
     public boolean shouldRender(T entity, Frustum frustum, double x, double y, double z) {
-        return true;
+        return !entity.isInvisible() && entity.isAlive();
     }
 
     @Override

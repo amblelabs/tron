@@ -17,6 +17,7 @@ import net.minecraft.util.Arm;
 import net.minecraft.util.Hand;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtList;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.math.*;
 import net.minecraft.world.World;
 import net.minecraft.block.BlockState;
@@ -26,12 +27,15 @@ import org.joml.Vector4f;
 
 import java.util.Collections;
 import java.util.LinkedList;
+import java.util.UUID;
 
 public class LightCycleEntity extends LivingEntity {
     private static final TrackedData<Vector3f> FACTION_COLOR = DataTracker.registerData(LightCycleEntity.class, TrackedDataHandlerRegistry.VECTOR3F);
     private static final TrackedData<Boolean> BEAM_ACTIVE = DataTracker.registerData(LightCycleEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
     private static final TrackedData<Integer> SPAWN_TICKS = DataTracker.registerData(LightCycleEntity.class, TrackedDataHandlerRegistry.INTEGER);
+    private static final TrackedData<Integer> DEATH_TICKS = DataTracker.registerData(LightCycleEntity.class, TrackedDataHandlerRegistry.INTEGER);
     public static final int SPAWN_ANIMATION_TICKS = 40;
+    public static final int DEATH_ANIMATION_TICKS = 30;
 
     public static class TrailCollider {
         public final Box box;
@@ -57,6 +61,10 @@ public class LightCycleEntity extends LivingEntity {
     // Smooth turning with momentum
     private float yawVelocity = 0.0f;
     private boolean lastBeamActiveState = false;
+    private boolean finalizingDeath;
+    private boolean recallToBatonPending;
+    @Nullable
+    private UUID recallPlayerUuid;
 
     @Override
     public double getMountedHeightOffset() {
@@ -97,6 +105,7 @@ public class LightCycleEntity extends LivingEntity {
         this.dataTracker.startTracking(FACTION_COLOR, new Vector3f(1.0f, 1.0f, 1.0f));
         this.dataTracker.startTracking(BEAM_ACTIVE, false);
         this.dataTracker.startTracking(SPAWN_TICKS, 0);
+        this.dataTracker.startTracking(DEATH_TICKS, 0);
     }
 
     public boolean isBeamActive() {
@@ -135,11 +144,113 @@ public class LightCycleEntity extends LivingEntity {
         return 1.0f - (MathHelper.clamp(this.getSpawnTicks() - tickDelta, 0.0f, (float) SPAWN_ANIMATION_TICKS) / (float) SPAWN_ANIMATION_TICKS);
     }
 
+    public int getDeathTicks() {
+        return this.dataTracker.get(DEATH_TICKS);
+    }
+
+    public void setDeathTicks(int ticks) {
+        this.dataTracker.set(DEATH_TICKS, MathHelper.clamp(ticks, 0, DEATH_ANIMATION_TICKS));
+    }
+
+    public boolean isDying() {
+        return this.getDeathTicks() > 0;
+    }
+
+    public void beginDeathAnimation() {
+        this.beginDeathAnimation(true);
+    }
+
+    private void beginDeathAnimation(boolean dismountNow) {
+        if (this.isDying() || this.finalizingDeath) {
+            return;
+        }
+        this.setDeathTicks(DEATH_ANIMATION_TICKS);
+        this.setBeamActive(false);
+        this.serverTrailPoints.clear();
+        this.serverTrailColliders.clear();
+        if (dismountNow) {
+            this.removeAllPassengers();
+        }
+        this.setVelocity(Vec3d.ZERO);
+    }
+
+    public void beginRecallAnimation(ServerPlayerEntity player) {
+        if (this.isDying() || this.finalizingDeath) {
+            return;
+        }
+
+        this.recallToBatonPending = true;
+        this.recallPlayerUuid = player.getUuid();
+        this.beginDeathAnimation(false);
+    }
+
+    public float getDeathProgress(float tickDelta) {
+        return 1.0f - (MathHelper.clamp(this.getDeathTicks() - tickDelta, 0.0f, (float) DEATH_ANIMATION_TICKS) / (float) DEATH_ANIMATION_TICKS);
+    }
+
+    public void ejectPassengersWithMomentum() {
+        if (this.getWorld().isClient()) {
+            return;
+        }
+
+        Vec3d horizontal = new Vec3d(this.getVelocity().x, 0.0, this.getVelocity().z);
+        if (horizontal.lengthSquared() < 1.0E-4) {
+            double yawRad = Math.toRadians(this.getYaw());
+            horizontal = new Vec3d(-Math.sin(yawRad), 0.0, Math.cos(yawRad)).multiply(0.7);
+        } else {
+            double launchSpeed = MathHelper.clamp(horizontal.length() * 1.25, 0.8, 1.6);
+            horizontal = horizontal.normalize().multiply(launchSpeed);
+        }
+
+        for (Entity passenger : new java.util.ArrayList<>(this.getPassengerList())) {
+            passenger.stopRiding();
+            passenger.setVelocity(passenger.getVelocity().add(horizontal.x, 0.45, horizontal.z));
+        }
+    }
+
+    @Override
+    public void kill() {
+        if (this.finalizingDeath) {
+            super.kill();
+            return;
+        }
+        this.beginDeathAnimation();
+    }
+
     private LightCycleMovingSoundInstance movingInstance;
 
     @Override
     public void tick() {
         super.tick();
+
+        if (this.isDying()) {
+            if (!this.getWorld().isClient()) {
+                this.setDeathTicks(this.getDeathTicks() - 1);
+            }
+            if (!this.getWorld().isClient() && this.getDeathTicks() <= 0) {
+                if (this.recallToBatonPending) {
+                    if (this.recallPlayerUuid != null && this.getWorld().getServer() != null) {
+                        ServerPlayerEntity recallPlayer = this.getWorld().getServer().getPlayerManager().getPlayer(this.recallPlayerUuid);
+                        ItemStack baton = new ItemStack(amble.tron.core.TronItems.LIGHTCYCLE_BATON);
+                        if (recallPlayer != null) {
+                            recallPlayer.stopRiding();
+                            if (!recallPlayer.getInventory().insertStack(baton)) {
+                                recallPlayer.dropItem(baton, false);
+                            }
+                        } else {
+                            this.dropStack(baton);
+                        }
+                    }
+                    this.recallToBatonPending = false;
+                    this.recallPlayerUuid = null;
+                }
+
+                this.finalizingDeath = true;
+                super.kill();
+                this.finalizingDeath = false;
+            }
+            return;
+        }
 
         if (this.getWorld().isClient()) {
             this.prevTilt = this.tilt;
@@ -223,10 +334,12 @@ public class LightCycleEntity extends LivingEntity {
                 }
             }
 
+        } else {
             if (this.getSpawnTicks() > 0) {
                 this.setSpawnTicks(this.getSpawnTicks() - 1);
+                return; // Skip trail and collision detection during spawn animation
             }
-        } else {
+
             boolean beamActive = this.isBeamActive();
             Vec3d backPos = new Vec3d(this.getX() + Math.sin(Math.toRadians(this.getYaw())) * 1.5, this.getY(), this.getZ() - Math.cos(Math.toRadians(this.getYaw())) * 1.5);
 
@@ -302,6 +415,7 @@ public class LightCycleEntity extends LivingEntity {
                         if (e instanceof LivingEntity && !this.getPassengerList().contains(e)) {
                             e.damage(this.getDamageSources().generic(), Float.MAX_VALUE);
                             if (e instanceof LightCycleEntity cycle) {
+                                cycle.ejectPassengersWithMomentum();
                                 cycle.damage(this.getDamageSources().generic(), Float.MAX_VALUE);
                                 cycle.kill();
                             }
@@ -316,7 +430,12 @@ public class LightCycleEntity extends LivingEntity {
             }
 
             if (collided) {
+                this.ejectPassengersWithMomentum();
                 this.damage(this.getDamageSources().generic(), Float.MAX_VALUE);
+
+                // Drop the baton item when the bike gets derezzed
+                ItemStack baton = new ItemStack(amble.tron.core.TronItems.LIGHTCYCLE_BATON);
+                this.dropItem(baton.getItem());
                 this.kill();
             }
 
@@ -326,6 +445,7 @@ public class LightCycleEntity extends LivingEntity {
                 if (otherCycle == this) continue;
                 for (TrailCollider collider : otherCycle.serverTrailColliders) {
                     if (collider.canKill && sweptBox.intersects(collider.box)) {
+                        this.ejectPassengersWithMomentum();
                         this.damage(this.getDamageSources().generic(), Float.MAX_VALUE);
                         this.kill();
                         break;
@@ -576,6 +696,11 @@ public class LightCycleEntity extends LivingEntity {
     public void writeCustomDataToNbt(NbtCompound nbt) {
         super.writeCustomDataToNbt(nbt);
         nbt.putInt("SpawnTicks", this.getSpawnTicks());
+        nbt.putInt("DeathTicks", this.getDeathTicks());
+        nbt.putBoolean("RecallToBatonPending", this.recallToBatonPending);
+        if (this.recallPlayerUuid != null) {
+            nbt.putUuid("RecallPlayer", this.recallPlayerUuid);
+        }
         nbt.putBoolean("BeamActive", this.isBeamActive());
         nbt.put("VisualTrail", this.visualTrail.toNbt());
 
@@ -612,6 +737,15 @@ public class LightCycleEntity extends LivingEntity {
         super.readCustomDataFromNbt(nbt);
         if (nbt.contains("SpawnTicks")) {
             this.setSpawnTicks(nbt.getInt("SpawnTicks"));
+        }
+        if (nbt.contains("DeathTicks")) {
+            this.setDeathTicks(nbt.getInt("DeathTicks"));
+        }
+        this.recallToBatonPending = nbt.getBoolean("RecallToBatonPending");
+        if (nbt.containsUuid("RecallPlayer")) {
+            this.recallPlayerUuid = nbt.getUuid("RecallPlayer");
+        } else {
+            this.recallPlayerUuid = null;
         }
         if (nbt.contains("BeamActive")) {
             this.setBeamActive(nbt.getBoolean("BeamActive"));

@@ -54,6 +54,18 @@ public class Keybindings {
                 player.playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.5f, 1.0f);
             }
         }));
+
+        register(new KeyBind.Held("recall_baton", "main", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_B, client -> {
+            ClientPlayerEntity player = client.player;
+
+            if (player == null)
+                return;
+
+            if (player.getVehicle() instanceof LightCycleEntity) {
+                ClientPlayNetworking.send(Tron.of("recall_baton"), PacketByteBufs.empty());
+                player.playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.5f, 0.8f);
+            }
+        }));
     }
 
     private static void register(KeyBind bind) {
