@@ -26,13 +26,12 @@ import org.joml.Vector4f;
 
 import java.util.Collections;
 import java.util.LinkedList;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class LightCycleEntity extends LivingEntity {
     private static final TrackedData<Vector3f> FACTION_COLOR = DataTracker.registerData(LightCycleEntity.class, TrackedDataHandlerRegistry.VECTOR3F);
     private static final TrackedData<Boolean> BEAM_ACTIVE = DataTracker.registerData(LightCycleEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
+    private static final TrackedData<Integer> SPAWN_TICKS = DataTracker.registerData(LightCycleEntity.class, TrackedDataHandlerRegistry.INTEGER);
+    public static final int SPAWN_ANIMATION_TICKS = 40;
 
     public static class TrailCollider {
         public final Box box;
@@ -51,7 +50,6 @@ public class LightCycleEntity extends LivingEntity {
     public final LinkedList<TrailCollider> serverTrailColliders = new LinkedList<>();
     public final LinkedList<Vec3d> serverTrailPoints = new LinkedList<>();
     private int trailSegmentCounter = 0;
-    private static final Map<UUID, Trail> VISUAL_TRAILS = new ConcurrentHashMap<>();
 
     public float tilt = 0.0f;
     public float prevTilt = 0.0f;
@@ -98,6 +96,7 @@ public class LightCycleEntity extends LivingEntity {
         super.initDataTracker();
         this.dataTracker.startTracking(FACTION_COLOR, new Vector3f(1.0f, 1.0f, 1.0f));
         this.dataTracker.startTracking(BEAM_ACTIVE, false);
+        this.dataTracker.startTracking(SPAWN_TICKS, 0);
     }
 
     public boolean isBeamActive() {
@@ -117,7 +116,23 @@ public class LightCycleEntity extends LivingEntity {
     }
 
     public Trail getVisualTrail() {
-        return VISUAL_TRAILS.computeIfAbsent(this.getUuid(), ignored -> this.visualTrail);
+        return this.visualTrail;
+    }
+
+    public int getSpawnTicks() {
+        return this.dataTracker.get(SPAWN_TICKS);
+    }
+
+    public void setSpawnTicks(int ticks) {
+        this.dataTracker.set(SPAWN_TICKS, MathHelper.clamp(ticks, 0, SPAWN_ANIMATION_TICKS));
+    }
+
+    public void beginSpawnAnimation() {
+        this.setSpawnTicks(SPAWN_ANIMATION_TICKS);
+    }
+
+    public float getSpawnProgress(float tickDelta) {
+        return 1.0f - (MathHelper.clamp(this.getSpawnTicks() - tickDelta, 0.0f, (float) SPAWN_ANIMATION_TICKS) / (float) SPAWN_ANIMATION_TICKS);
     }
 
     private LightCycleMovingSoundInstance movingInstance;
@@ -206,6 +221,10 @@ public class LightCycleEntity extends LivingEntity {
                         collider.canKill = true;
                     }
                 }
+            }
+
+            if (this.getSpawnTicks() > 0) {
+                this.setSpawnTicks(this.getSpawnTicks() - 1);
             }
         } else {
             boolean beamActive = this.isBeamActive();
@@ -556,8 +575,9 @@ public class LightCycleEntity extends LivingEntity {
     @Override
     public void writeCustomDataToNbt(NbtCompound nbt) {
         super.writeCustomDataToNbt(nbt);
+        nbt.putInt("SpawnTicks", this.getSpawnTicks());
         nbt.putBoolean("BeamActive", this.isBeamActive());
-        nbt.put("VisualTrail", this.getVisualTrail().toNbt());
+        nbt.put("VisualTrail", this.visualTrail.toNbt());
 
         NbtList points = new NbtList();
         for (Vec3d point : this.serverTrailPoints) {
@@ -590,12 +610,14 @@ public class LightCycleEntity extends LivingEntity {
     @Override
     public void readCustomDataFromNbt(NbtCompound nbt) {
         super.readCustomDataFromNbt(nbt);
+        if (nbt.contains("SpawnTicks")) {
+            this.setSpawnTicks(nbt.getInt("SpawnTicks"));
+        }
         if (nbt.contains("BeamActive")) {
             this.setBeamActive(nbt.getBoolean("BeamActive"));
         }
-
         if (nbt.contains("VisualTrail", 10)) {
-            this.getVisualTrail().fromNbt(nbt.getCompound("VisualTrail"));
+            this.visualTrail.fromNbt(nbt.getCompound("VisualTrail"));
         }
 
         this.serverTrailPoints.clear();

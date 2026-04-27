@@ -22,6 +22,11 @@ public class LightCycleEntityRenderer<T extends LightCycleEntity> extends Entity
 
     @Override
     public void render(T entity, float yaw, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
+        float spawnProgress = entity.getSpawnProgress(tickDelta);
+        float lineAlpha = net.minecraft.util.math.MathHelper.clamp(1.0f - spawnProgress * 3.0f, 0.0f, 1.0f);
+        float quadAlpha = net.minecraft.util.math.MathHelper.clamp(1.0f - Math.abs(spawnProgress * 3.0f - 1.0f), 0.0f, 1.0f);
+        float modelAlpha = net.minecraft.util.math.MathHelper.clamp(spawnProgress * 3.0f - 2.0f, 0.0f, 1.0f);
+
         matrices.push();
         matrices.multiply(RotationAxis.NEGATIVE_Y.rotationDegrees(yaw));
 
@@ -30,7 +35,18 @@ public class LightCycleEntityRenderer<T extends LightCycleEntity> extends Entity
 
         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(180f));
         matrices.translate(0, -1.5, 0);
-        this.model.render(matrices, vertexConsumers.getBuffer(RenderLayer.getEntityCutout(this.getTexture(entity))), light, OverlayTexture.DEFAULT_UV, 1, 1, 1, 1);
+
+        if (lineAlpha > 0.0f) {
+            this.model.render(matrices, vertexConsumers.getBuffer(RenderLayer.getLines()), light, OverlayTexture.DEFAULT_UV, 1, 1, 1, lineAlpha);
+        }
+
+        if (quadAlpha > 0.0f) {
+            this.model.render(matrices, vertexConsumers.getBuffer(RenderLayer.getDebugQuads()), light, OverlayTexture.DEFAULT_UV, 1, 1, 1, quadAlpha);
+        }
+
+        if (modelAlpha > 0.0f) {
+            this.model.render(matrices, vertexConsumers.getBuffer(RenderLayer.getEntityCutout(this.getTexture(entity))), light, OverlayTexture.DEFAULT_UV, 1, 1, 1, modelAlpha);
+        }
 
         Vector3f color = entity.getColor();
         this.model.render(matrices, vertexConsumers.getBuffer(RenderLayer.getEyes(this.getEmission())), light, OverlayTexture.DEFAULT_UV, color.x, color.y, color.z, 1);

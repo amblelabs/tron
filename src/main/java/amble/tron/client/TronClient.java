@@ -1,6 +1,7 @@
 package amble.tron.client;
 
 import amble.tron.Tron;
+import amble.tron.client.render.LightcycleBatonThrownItemRenderer;
 import amble.tron.client.render.IdentityDiscThrownItemRenderer;
 import amble.tron.client.render.entity.renderer.LightCycleEntityRenderer;
 import amble.tron.core.Keybindings;
@@ -27,10 +28,12 @@ public class TronClient implements ClientModInitializer {
         TronAttachmentTypes.init();
         Keybindings.init();
         EntityRendererRegistry.register(TronEntities.IDENTITY_DISC, IdentityDiscThrownItemRenderer::new);
+        EntityRendererRegistry.register(TronEntities.LIGHTCYCLE_BATON_THROWN, LightcycleBatonThrownItemRenderer::new);
         EntityRendererRegistry.register(TronEntities.LIGHT_CYCLE, LightCycleEntityRenderer::new);
         registerClientReceivers();
     }
 
+    @SuppressWarnings("UnstableApiUsage")
     private void registerClientReceivers() {
         ClientPlayNetworking.registerGlobalReceiver(ATTACHMENT_UPDATE, (client, handler, buf, responseSender) -> {
             Identifier attachmentId = buf.readIdentifier(); // must match the server order
