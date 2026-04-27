@@ -109,6 +109,6 @@ public class TrailRenderer {
         float g = color.y;
         float b = color.z;
         
-        lineVertexConsumer.vertex(p.x, p.y, p.z, r, g, b, a + 0xf000f0, u, v, OverlayTexture.DEFAULT_UV, light, 1, 0, 0);
+        lineVertexConsumer.vertex(p.x, p.y, p.z, r, g, b, a, u, v, OverlayTexture.DEFAULT_UV, light, 1, 0, 0);
     }
 }
