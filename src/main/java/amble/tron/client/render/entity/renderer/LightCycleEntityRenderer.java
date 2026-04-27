@@ -3,24 +3,17 @@ package amble.tron.client.render.entity.renderer;
 import amble.tron.Tron;
 import amble.tron.client.models.LightCycleModel;
 import amble.tron.core.entities.LightCycleEntity;
-import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.RedstoneLampBlock;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.*;
 import net.minecraft.client.render.entity.EntityRenderer;
 import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.RotationAxis;
-import amble.tron.client.render.entity.renderer.TrailRenderer;
-import amble.tron.core.TronAttachmentUtil;
-import net.minecraft.entity.player.PlayerEntity;
 import org.joml.Vector3f;
 
 public class LightCycleEntityRenderer<T extends LightCycleEntity> extends EntityRenderer<T> {
 
-    private LightCycleModel model;
+    private final LightCycleModel model;
 
     public LightCycleEntityRenderer(EntityRendererFactory.Context ctx) {
         super(ctx);
@@ -41,13 +34,10 @@ public class LightCycleEntityRenderer<T extends LightCycleEntity> extends Entity
 
         Vector3f color = entity.getColor();
         this.model.render(matrices, vertexConsumers.getBuffer(RenderLayer.getEyes(this.getEmission())), light, OverlayTexture.DEFAULT_UV, color.x, color.y, color.z, 1);
-        /*MinecraftClient.getInstance().getBlockRenderManager().renderBlock(Blocks.REDSTONE_LAMP.getDefaultState().with(RedstoneLampBlock.LIT, true), entity.getBlockPos(),
-                entity.getWorld(), matrices, vertexConsumers.getBuffer(RenderLayers.getBlockLayer(Blocks.REDSTONE_LAMP.getDefaultState())), false, entity.getWorld().getRandom());
-        */
         matrices.pop();
 
         // Render light trail
-        TrailRenderer.render(entity.visualTrail, vertexConsumers, matrices.peek(), color);
+        TrailRenderer.render(entity.getVisualTrail(), vertexConsumers, matrices.peek(), color);
 
         super.render(entity, yaw, tickDelta, matrices, vertexConsumers, light);
     }

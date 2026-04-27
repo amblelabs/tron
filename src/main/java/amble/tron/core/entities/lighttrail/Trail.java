@@ -1,5 +1,6 @@
 package amble.tron.core.entities.lighttrail;
 
+import net.minecraft.nbt.NbtCompound;
 import org.joml.Vector4f;
 
 public class Trail {
@@ -42,5 +43,26 @@ public class Trail {
 
         lastIndex = (lastIndex + 1) % size;
         entries++;
+    }
+
+    public NbtCompound toNbt() {
+        NbtCompound nbt = new NbtCompound();
+        nbt.putInt("LastIndex", this.lastIndex);
+        nbt.putInt("Entries", this.entries);
+        nbt.putInt("NullEntries", this.nullEntries);
+        for (int i = 0; i < this.buffer.length; i++) {
+            nbt.putFloat("B" + i, this.buffer[i]);
+        }
+        return nbt;
+    }
+
+    public void fromNbt(NbtCompound nbt) {
+        for (int i = 0; i < this.buffer.length; i++) {
+            this.buffer[i] = nbt.getFloat("B" + i);
+        }
+
+        this.lastIndex = nbt.getInt("LastIndex");
+        this.entries = nbt.getInt("Entries");
+        this.nullEntries = nbt.getInt("NullEntries");
     }
 }

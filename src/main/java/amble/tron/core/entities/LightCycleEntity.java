@@ -12,10 +12,11 @@ import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.SwordItem;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Arm;
 import net.minecraft.util.Hand;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtList;
 import net.minecraft.util.math.*;
 import net.minecraft.world.World;
 import net.minecraft.block.BlockState;
@@ -25,6 +26,9 @@ import org.joml.Vector4f;
 
 import java.util.Collections;
 import java.util.LinkedList;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class LightCycleEntity extends LivingEntity {
     private static final TrackedData<Vector3f> FACTION_COLOR = DataTracker.registerData(LightCycleEntity.class, TrackedDataHandlerRegistry.VECTOR3F);
@@ -47,15 +51,14 @@ public class LightCycleEntity extends LivingEntity {
     public final LinkedList<TrailCollider> serverTrailColliders = new LinkedList<>();
     public final LinkedList<Vec3d> serverTrailPoints = new LinkedList<>();
     private int trailSegmentCounter = 0;
+    private static final Map<UUID, Trail> VISUAL_TRAILS = new ConcurrentHashMap<>();
 
     public float tilt = 0.0f;
     public float prevTilt = 0.0f;
 
-    private boolean boosting = false;
-
     // Smooth turning with momentum
     private float yawVelocity = 0.0f;
-    private float targetSteer = 0.0f;
+    private boolean lastBeamActiveState = false;
 
     @Override
     public double getMountedHeightOffset() {
@@ -113,6 +116,10 @@ public class LightCycleEntity extends LivingEntity {
         this.dataTracker.set(FACTION_COLOR, color);
     }
 
+    public Trail getVisualTrail() {
+        return VISUAL_TRAILS.computeIfAbsent(this.getUuid(), ignored -> this.visualTrail);
+    }
+
     private LightCycleMovingSoundInstance movingInstance;
 
     @Override
@@ -143,9 +150,11 @@ public class LightCycleEntity extends LivingEntity {
             Vector4f v2 = new Vector4f((float) (backX + upX * 1.1), (float) (y + upY * 1.1), (float) (backZ + upZ * 1.1), 1.0f);
 
             double speedSq = (this.getX() - this.prevX) * (this.getX() - this.prevX) + (this.getZ() - this.prevZ) * (this.getZ() - this.prevZ);
-            // Trail disappears if not moving fast enough or beam is toggled off
-            float alpha = ((this.getVelocity().lengthSquared() > 0.01 || speedSq > 0.001) && this.isBeamActive()) ? 1.0f : 0.0f;
-            this.visualTrail.add(v1, v2, alpha);
+            boolean isEmitting = (this.getVelocity().lengthSquared() > 0.01 || speedSq > 0.001) && this.isBeamActive();
+            // Only add segments while actively emitting so existing trail chunks persist instead of rapidly fading out.
+            if (isEmitting) {
+                this.getVisualTrail().add(v1, v2, 1.0f);
+            }
 
             SoundManager soundManager = MinecraftClient.getInstance().getSoundManager();
 
@@ -160,7 +169,7 @@ public class LightCycleEntity extends LivingEntity {
             }
             
             // Client-side physics colliders for prediction
-            if ((speedSq > 0.001 || this.getVelocity().lengthSquared() > 0.01) && this.isBeamActive()) {
+            if (isEmitting) {
                 Vec3d curPoint = new Vec3d(backX, this.getY(), backZ);
 
                 if (!this.serverTrailPoints.isEmpty()) {
@@ -198,21 +207,24 @@ public class LightCycleEntity extends LivingEntity {
                     }
                 }
             }
-            return;
-        }
-
-        if (!this.getWorld().isClient()) {
+        } else {
+            boolean beamActive = this.isBeamActive();
             Vec3d backPos = new Vec3d(this.getX() + Math.sin(Math.toRadians(this.getYaw())) * 1.5, this.getY(), this.getZ() - Math.cos(Math.toRadians(this.getYaw())) * 1.5);
 
-            // Clear colliders when beam is not active
-            if (!this.isBeamActive()) {
+            // Stop emitting while off, but keep existing colliders so disconnected visible trail chunks can still damage.
+            if (!beamActive) {
                 this.serverTrailPoints.clear();
-                this.serverTrailColliders.clear();
             }
+
+            // Break trail continuity on state transitions to avoid reconnecting separated beam chunks.
+            if (beamActive != this.lastBeamActiveState) {
+                this.serverTrailPoints.clear();
+            }
+            this.lastBeamActiveState = beamActive;
 
             // Create collision boxes (matching logic from working commit fdf8da5)
             boolean shouldAddBox = false;
-            if (this.isBeamActive()) {
+            if (beamActive) {
                 if (this.serverTrailPoints.isEmpty()) {
                     shouldAddBox = true;
                 } else {
@@ -308,10 +320,6 @@ public class LightCycleEntity extends LivingEntity {
             if (factionColor != null && !factionColor.equals(this.getColor())) {
                 this.setColor(factionColor);
             }
-
-            if (this.isBeamActive()) {
-                this.spawnTrailIfNeeded();
-            }
         }
     }
 
@@ -321,7 +329,6 @@ public class LightCycleEntity extends LivingEntity {
         float forwardInput = controllingPlayer.forwardSpeed;
         float sidewaysInput = controllingPlayer.sidewaysSpeed;
         boolean isBraking = forwardInput < -0.1F;
-        boolean isAccelerating = forwardInput > 0.1F;
 
         // Calculate current speed for turn rate scaling
         Vec3d currentVel = this.getVelocity();
@@ -330,17 +337,18 @@ public class LightCycleEntity extends LivingEntity {
         // Smooth steering with momentum - target steer based on input
         float maxTurnRate = 4.0F; // Maximum degrees per tick the bike can turn
         float turnAccel = 0.4F;   // How quickly yaw velocity changes
+        float targetSteer;
 
         // Only allow steering when moving
         if (currentSpeed > 0.02) {
             // Target steering angle based on sideways input
-            this.targetSteer = -sidewaysInput * maxTurnRate;
+            targetSteer = -sidewaysInput * maxTurnRate;
         } else {
-            this.targetSteer = 0.0F;
+            targetSteer = 0.0F;
         }
 
         // Smoothly interpolate yaw velocity toward target (momentum)
-        this.yawVelocity = MathHelper.lerp(turnAccel, this.yawVelocity, this.targetSteer);
+        this.yawVelocity = MathHelper.lerp(turnAccel, this.yawVelocity, targetSteer);
 
         // Clamp yaw velocity to prevent snapping
         this.yawVelocity = MathHelper.clamp(this.yawVelocity, -maxTurnRate, maxTurnRate);
@@ -450,16 +458,6 @@ public class LightCycleEntity extends LivingEntity {
         return new Vec2f(controllingPassenger.getPitch() * 0.5F, controllingPassenger.getYaw());
     }
 
-    protected Vec3d getControlledMovementInput(PlayerEntity controllingPlayer, Vec3d movementInput) {
-        float f = controllingPlayer.sidewaysSpeed * 0.5F;
-        float g = controllingPlayer.forwardSpeed;
-        if (g <= 0.0F) {
-            g *= 0.25F;
-        }
-
-        return new Vec3d(f, 0.0, g);
-    }
-
     @Nullable
     public LivingEntity getControllingPassenger() {
         Entity firstPassenger = this.getFirstPassenger();
@@ -555,36 +553,84 @@ public class LightCycleEntity extends LivingEntity {
     public void animateDamage(float yaw) {
     }
 
-    // trail state (server side)
-    private int trailTicker = 0;
-    private static final int TRAIL_TICK_INTERVAL = 4; // spawn every 4 ticks
-    private static final double SEGMENT_SPACING = 0.4;
-    // store last spawned segment world position to pass into the next segment
-    private Vec3d lastTrailSegmentPos = null;
+    @Override
+    public void writeCustomDataToNbt(NbtCompound nbt) {
+        super.writeCustomDataToNbt(nbt);
+        nbt.putBoolean("BeamActive", this.isBeamActive());
+        nbt.put("VisualTrail", this.getVisualTrail().toNbt());
 
-    protected void spawnTrailIfNeeded() {
-        if (this.getWorld().isClient()) return;
+        NbtList points = new NbtList();
+        for (Vec3d point : this.serverTrailPoints) {
+            NbtCompound pointNbt = new NbtCompound();
+            pointNbt.putDouble("x", point.x);
+            pointNbt.putDouble("y", point.y);
+            pointNbt.putDouble("z", point.z);
+            points.add(pointNbt);
+        }
+        nbt.put("ServerTrailPoints", points);
 
-        trailTicker++;
-        if (trailTicker < 1) return;
-        trailTicker = 0;
+        NbtList colliders = new NbtList();
+        for (TrailCollider collider : this.serverTrailColliders) {
+            NbtCompound colliderNbt = new NbtCompound();
+            colliderNbt.putDouble("minX", collider.box.minX);
+            colliderNbt.putDouble("minY", collider.box.minY);
+            colliderNbt.putDouble("minZ", collider.box.minZ);
+            colliderNbt.putDouble("maxX", collider.box.maxX);
+            colliderNbt.putDouble("maxY", collider.box.maxY);
+            colliderNbt.putDouble("maxZ", collider.box.maxZ);
+            colliderNbt.putInt("age", collider.age);
+            colliderNbt.putBoolean("canKill", collider.canKill);
+            colliderNbt.putInt("segmentIndex", collider.segmentIndex);
+            colliders.add(colliderNbt);
+        }
+        nbt.put("ServerTrailColliders", colliders);
+        nbt.putInt("TrailSegmentCounter", this.trailSegmentCounter);
+    }
 
-        // spawn position slightly behind the cycle
-        double yawRad = Math.toRadians(this.getYaw());
-        double backX = this.getX() + Math.sin(yawRad) * 1;
-        double backZ = this.getZ() - Math.cos(yawRad) * 1;
-        double y = this.getY(); // adjust to match foot height
-
-        Vector3f prevPosVec;
-        if (this.lastTrailSegmentPos != null) {
-            prevPosVec = new Vector3f((float) this.lastTrailSegmentPos.x, (float) this.lastTrailSegmentPos.y, (float) this.lastTrailSegmentPos.z);
-        } else {
-            prevPosVec = this.getPos().toVector3f();
+    @Override
+    public void readCustomDataFromNbt(NbtCompound nbt) {
+        super.readCustomDataFromNbt(nbt);
+        if (nbt.contains("BeamActive")) {
+            this.setBeamActive(nbt.getBoolean("BeamActive"));
         }
 
-        // Do the queue system for the points of which the lightcycle will store - Loqor
+        if (nbt.contains("VisualTrail", 10)) {
+            this.getVisualTrail().fromNbt(nbt.getCompound("VisualTrail"));
+        }
 
-        // remember this segment's center for the next one
-        this.lastTrailSegmentPos = new Vec3d(backX, y, backZ);
+        this.serverTrailPoints.clear();
+        if (nbt.contains("ServerTrailPoints", 9)) {
+            NbtList points = nbt.getList("ServerTrailPoints", 10);
+            for (int i = 0; i < points.size(); i++) {
+                NbtCompound pointNbt = points.getCompound(i);
+                this.serverTrailPoints.add(new Vec3d(pointNbt.getDouble("x"), pointNbt.getDouble("y"), pointNbt.getDouble("z")));
+            }
+        }
+
+        this.serverTrailColliders.clear();
+        if (nbt.contains("ServerTrailColliders", 9)) {
+            NbtList colliders = nbt.getList("ServerTrailColliders", 10);
+            for (int i = 0; i < colliders.size(); i++) {
+                NbtCompound colliderNbt = colliders.getCompound(i);
+                Box box = new Box(
+                        colliderNbt.getDouble("minX"),
+                        colliderNbt.getDouble("minY"),
+                        colliderNbt.getDouble("minZ"),
+                        colliderNbt.getDouble("maxX"),
+                        colliderNbt.getDouble("maxY"),
+                        colliderNbt.getDouble("maxZ")
+                );
+                TrailCollider collider = new TrailCollider(box, colliderNbt.getInt("segmentIndex"));
+                collider.age = colliderNbt.getInt("age");
+                collider.canKill = colliderNbt.getBoolean("canKill");
+                this.serverTrailColliders.add(collider);
+            }
+        }
+
+        if (nbt.contains("TrailSegmentCounter")) {
+            this.trailSegmentCounter = nbt.getInt("TrailSegmentCounter");
+        }
+
+        this.lastBeamActiveState = this.isBeamActive();
     }
 }
