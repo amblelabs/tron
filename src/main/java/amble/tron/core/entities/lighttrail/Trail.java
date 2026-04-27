@@ -3,6 +3,8 @@ package amble.tron.core.entities.lighttrail;
 import net.minecraft.nbt.NbtCompound;
 import org.joml.Vector4f;
 
+import java.util.Arrays;
+
 public class Trail {
     public final float[] buffer;
     public final int size;
@@ -64,5 +66,12 @@ public class Trail {
         this.lastIndex = nbt.getInt("LastIndex");
         this.entries = nbt.getInt("Entries");
         this.nullEntries = nbt.getInt("NullEntries");
+    }
+
+    public void clear() {
+        Arrays.fill(this.buffer, 0.0f);
+        this.lastIndex = 0;
+        this.entries = 0;
+        this.nullEntries = 0;
     }
 }

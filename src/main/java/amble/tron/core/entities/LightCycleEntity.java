@@ -113,7 +113,30 @@ public class LightCycleEntity extends LivingEntity {
     }
 
     public void setBeamActive(boolean flag) {
+        boolean wasActive = this.isBeamActive();
+        if (wasActive == flag) {
+            return;
+        }
+
         this.dataTracker.set(BEAM_ACTIVE, flag);
+
+        // Always break segment continuity on toggle so off->on never reconnects old and new beams.
+        this.serverTrailPoints.clear();
+        if (this.getWorld().isClient()) {
+            this.addVisualTrailGapMarker();
+        }
+        this.lastBeamActiveState = flag;
+    }
+
+    private void addVisualTrailGapMarker() {
+        double yawRad = Math.toRadians(this.getYaw());
+        double backX = this.getX() + Math.sin(yawRad) * 1.5;
+        double backZ = this.getZ() - Math.cos(yawRad) * 1.5;
+        double y = this.getY();
+
+        Vector4f v1 = new Vector4f((float) backX, (float) (y + 0.1), (float) backZ, 1.0f);
+        Vector4f v2 = new Vector4f((float) backX, (float) (y + 1.1), (float) backZ, 1.0f);
+        this.visualTrail.add(v1, v2, 0.0f);
     }
 
     public Vector3f getColor() {
@@ -166,8 +189,7 @@ public class LightCycleEntity extends LivingEntity {
         }
         this.setDeathTicks(DEATH_ANIMATION_TICKS);
         this.setBeamActive(false);
-        this.serverTrailPoints.clear();
-        this.serverTrailColliders.clear();
+        this.clearTrailState();
         if (dismountNow) {
             this.removeAllPassengers();
         }
@@ -206,6 +228,13 @@ public class LightCycleEntity extends LivingEntity {
             passenger.stopRiding();
             passenger.setVelocity(passenger.getVelocity().add(horizontal.x, 0.45, horizontal.z));
         }
+    }
+
+    private void clearTrailState() {
+        this.visualTrail.clear();
+        this.serverTrailPoints.clear();
+        this.serverTrailColliders.clear();
+        this.trailSegmentCounter = 0;
     }
 
     @Override
@@ -250,6 +279,29 @@ public class LightCycleEntity extends LivingEntity {
                 this.finalizingDeath = false;
             }
             return;
+        }
+
+        LivingEntity controllingPassenger = this.getControllingPassenger();
+        boolean hasControllingPassenger = controllingPassenger != null;
+
+        // Dismount stops new emission, but existing segments remain until recall/death.
+        if (!hasControllingPassenger && !this.getWorld().isClient() && this.isBeamActive()) {
+            this.setBeamActive(false);
+        }
+
+        // Clear steering momentum when unridden, but let world physics (gravity/water) still apply.
+        if (!hasControllingPassenger) {
+            this.yawVelocity = 0.0f;
+        }
+
+        // DataTracker updates do not call setBeamActive on clients; detect transitions here too.
+        boolean beamActiveNow = this.isBeamActive();
+        if (beamActiveNow != this.lastBeamActiveState) {
+            this.serverTrailPoints.clear();
+            if (this.getWorld().isClient()) {
+                this.addVisualTrailGapMarker();
+            }
+            this.lastBeamActiveState = beamActiveNow;
         }
 
         if (this.getWorld().isClient()) {
@@ -348,11 +400,6 @@ public class LightCycleEntity extends LivingEntity {
                 this.serverTrailPoints.clear();
             }
 
-            // Break trail continuity on state transitions to avoid reconnecting separated beam chunks.
-            if (beamActive != this.lastBeamActiveState) {
-                this.serverTrailPoints.clear();
-            }
-            this.lastBeamActiveState = beamActive;
 
             // Create collision boxes (matching logic from working commit fdf8da5)
             boolean shouldAddBox = false;
@@ -454,7 +501,7 @@ public class LightCycleEntity extends LivingEntity {
             }
         }
 
-        if (this.getControllingPassenger() instanceof PlayerEntity player) {
+        if (controllingPassenger instanceof PlayerEntity player) {
             Vector3f factionColor = TronAttachmentUtil.getFactionColor(player);
             if (factionColor != null && !factionColor.equals(this.getColor())) {
                 this.setColor(factionColor);
@@ -685,7 +732,7 @@ public class LightCycleEntity extends LivingEntity {
 
     @Override
     public boolean hasNoDrag() {
-        return true;
+        return this.getControllingPassenger() != null;
     }
 
     @Override

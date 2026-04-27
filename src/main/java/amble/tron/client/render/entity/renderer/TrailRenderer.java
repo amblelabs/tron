@@ -37,15 +37,16 @@ public class TrailRenderer {
             int pre = preIndex * 7;
             int index = curIndex * 7;
 
-            // Age is distance from the newest point (head of the trail)
-            int age1 = numPoints - 1 - j;
-            int age2 = numPoints - 1 - (j + 1);
+            // A zero-alpha point is an intentional gap marker; never connect across it.
+            if (trail.buffer[pre + 6] <= 0.0f || trail.buffer[index + 6] <= 0.0f) {
+                continue;
+            }
 
-            float fraction1 = Math.max(0.0f, 0.75f * (1.0f - ((float) age1 / trail.size)));
-            float fraction2 = Math.max(0.0f, 0.75f * (1.0f - ((float) age2 / trail.size)));
-
-            float a1 = fraction1 * trail.buffer[pre + 6];
-            float a2 = fraction2 * trail.buffer[index + 6];
+            float a1 = trail.buffer[pre + 6];
+            float a2 = trail.buffer[index + 6];
+            if (a1 <= 0.0f && a2 <= 0.0f) {
+                continue;
+            }
 
             float dx = trail.buffer[index] - trail.buffer[pre];
             float dz = trail.buffer[index + 2] - trail.buffer[pre + 2];
