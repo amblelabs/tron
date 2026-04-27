@@ -10,6 +10,7 @@ import net.minecraft.client.render.entity.EntityRenderer;
 import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.render.item.ItemRenderer;
 import net.minecraft.client.render.model.json.ModelTransformationMode;
+import net.minecraft.client.texture.SpriteAtlasTexture;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
 import net.minecraft.item.ItemStack;
@@ -60,7 +61,7 @@ public class LightcycleBatonThrownItemRenderer<T extends Entity> extends EntityR
 
     @Override
     public Identifier getTexture(Entity entity) {
-        return new Identifier("minecraft", "textures/atlas/blocks.png");
+        return SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE;
     }
 }
 

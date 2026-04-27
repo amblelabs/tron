@@ -77,7 +77,6 @@ public class IdentityDiscThrownItemRenderer<T extends Entity>
             return;
         }
 
-        // Render with a copy so renderer-side mutation does not leak or desync other contexts.
         ItemStack renderStack = original.copy();
         disc.__setRGB(flyingItem.getColor(), renderStack);
 

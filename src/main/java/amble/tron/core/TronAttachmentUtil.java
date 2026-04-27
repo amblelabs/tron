@@ -64,7 +64,6 @@ public class TronAttachmentUtil {
         }
     }
 
-    // Broadcast example (only when needed — prefer tracking players instead of everyone)
     public static void broadcastFactionColor(ServerPlayerEntity subject, ServerPlayerEntity except, Vector3f color, MinecraftServer server) {
         int subjectId = subject.getId();
         for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {

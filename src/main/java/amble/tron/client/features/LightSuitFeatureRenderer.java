@@ -91,9 +91,6 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
         Vector3f theoSpecific = new Vector3f(1, 0, 0);
         Vector3f finalProgram = rectified;
         if (stack.getItem() instanceof LightSuitItem lightSuitItem) {
-            /*if (finalProgram != lightSuitItem.getRGB(stack)) {
-                lightSuitItem.setRGB(finalProgram, stack);
-            }*/
             this.model.render(matrixStack, vertexConsumerProvider.getBuffer(RenderLayer.getEyes(LIGHTSUIT_LIGHTS)), i, OverlayTexture.DEFAULT_UV,
                     lightSuitItem.getRGB(stack).x, lightSuitItem.getRGB(stack).y, lightSuitItem.getRGB(stack).z, 1f);
         }
@@ -110,7 +107,7 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
             matrixStack.multiply(RotationAxis.NEGATIVE_Z.rotationDegrees(90));
 
             ItemStack renderDisc = new ItemStack(amble.tron.core.TronItems.IDENTITY_DISC);
-            Vector3f factionColor = null;
+            Vector3f factionColor;
             if (stack.getItem() instanceof LightSuitItem lightSuitItem) {
                 factionColor = lightSuitItem.getRGB(stack);
             } else {
@@ -124,65 +121,5 @@ public class LightSuitFeatureRenderer<T extends AbstractClientPlayerEntity, M ex
             }
             matrixStack.pop();
         }
-    }
-
-    public void enablePart(M model, BodyParts part) {
-        switch (part) {
-            case HEAD:
-                model.head.visible = true;
-                break;
-            case CHEST:
-                model.body.visible = true;
-                model.leftArm.visible = true;
-                model.rightArm.visible = true;
-                break;
-            case LEGS:
-                model.leftPants.visible = true;
-                model.rightPants.visible = true;
-
-                break;
-            /*case FEET:
-                model.LeftFoot.visible = true;
-                model.RightFoot.visible = true;
-                break;*/
-        }
-    }
-
-    public void disablePart(M model, BodyParts part) {
-        switch (part) {
-            case HEAD:
-                model.head.visible = false;
-                break;
-            case CHEST:
-                model.body.visible = false;
-                model.leftPants.visible = false;
-                model.rightPants.visible = false;
-                break;
-            case LEGS:
-                model.leftPants.visible = false;
-                model.rightPants.visible = false;
-                break;
-            /*case FEET:
-                model.LeftFoot.visible = false;
-                model.RightFoot.visible = false;
-                break;*/
-        }
-    }
-
-    public static ItemStack getModelForSlot(LivingEntity entity, BodyParts parts) {
-        return switch(parts) {
-            case CHEST -> entity.getEquippedStack(EquipmentSlot.CHEST);
-            case LEGS -> entity.getEquippedStack(EquipmentSlot.LEGS);
-            //case FEET -> entity.getEquippedStack(EquipmentSlot.FEET);
-            default -> entity.getEquippedStack(EquipmentSlot.HEAD);
-        };
-    }
-
-
-    public enum BodyParts {
-        HEAD,
-        CHEST,
-        LEGS,
-        //FEET
     }
 }

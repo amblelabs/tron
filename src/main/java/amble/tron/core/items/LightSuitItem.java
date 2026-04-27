@@ -19,11 +19,8 @@ import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 import org.joml.Vector3f;
 
-public class LightSuitItem extends ArmorItem {
+public class LightSuitItem extends ArmorItem implements TronColor {
     public static final Identifier CHANGE_COLOR_LIGHTSUIT = Tron.of("change_color_lightsuit");
-    private static final String red = "X";
-    private static final String green = "Y";
-    private static final String blue = "Z";
 
     public LightSuitItem(ArmorMaterial material, Type type, Settings settings) {
         super(material, type, settings);
@@ -48,15 +45,6 @@ public class LightSuitItem extends ArmorItem {
         compound.putFloat(green, 1);
         compound.putFloat(blue, 1);
         return stack;
-    }
-
-    public Vector3f getRGB(ItemStack stack) {
-        if (!(stack.getItem() instanceof LightSuitItem)) return new Vector3f(1, 1, 1);
-        NbtCompound nbt = stack.getOrCreateNbt();
-        if (nbt.contains(red) && nbt.contains(green) && nbt.contains(blue)) {
-            return new Vector3f(nbt.getFloat(red), nbt.getFloat(green), nbt.getFloat(blue));
-        }
-        return new Vector3f(1, 1, 1);
     }
 
     public void setRGB(ServerPlayerEntity player, Vector3f vector3f, ItemStack stack) {

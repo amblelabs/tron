@@ -30,14 +30,10 @@ import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.EquipmentSlot;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Multimaps;
 
-public class IdentityDiscItem extends Item {
+public class IdentityDiscItem extends Item implements TronColor {
     public static final Identifier CHANGE_COLOR = Tron.of("change_color");
     public static final Identifier RETRACT_BLADE = Tron.of("retract_blade");
-    private static final String red = "X";
-    private static final String green = "Y";
-    private static final String blue = "Z";
     private static final String bladeRetracted = "bladeRetracted";
 
     static  {
@@ -99,15 +95,6 @@ public class IdentityDiscItem extends Item {
         if (!(stack.getItem() instanceof IdentityDiscItem)) return;
         NbtCompound nbt = stack.getOrCreateNbt();
         nbt.putBoolean(bladeRetracted, retract);
-    }
-
-    public Vector3f getRGB(ItemStack stack) {
-        if (!(stack.getItem() instanceof IdentityDiscItem)) return new Vector3f(1, 1, 1);
-        NbtCompound nbt = stack.getOrCreateNbt();
-        if (nbt.contains(red) && nbt.contains(green) && nbt.contains(blue)) {
-            return new Vector3f(nbt.getFloat(red), nbt.getFloat(green), nbt.getFloat(blue));
-        }
-        return new Vector3f(1, 1, 1);
     }
 
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {

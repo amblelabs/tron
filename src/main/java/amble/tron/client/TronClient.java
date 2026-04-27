@@ -36,7 +36,7 @@ public class TronClient implements ClientModInitializer {
     @SuppressWarnings("UnstableApiUsage")
     private void registerClientReceivers() {
         ClientPlayNetworking.registerGlobalReceiver(ATTACHMENT_UPDATE, (client, handler, buf, responseSender) -> {
-            Identifier attachmentId = buf.readIdentifier(); // must match the server order
+            Identifier attachmentId = buf.readIdentifier();
             int targetId = buf.readInt();
             float x = buf.readFloat();
             float y = buf.readFloat();
@@ -70,19 +70,6 @@ public class TronClient implements ClientModInitializer {
                 }
             });
         });
-
-        /*ClientPlayNetworking.registerGlobalReceiver(RETRACT_BLADE, (client, handler, buf, responseSender) -> {
-            boolean retracted = buf.readBoolean();
-            ItemStack stack = client.player.getActiveHand() == Hand.MAIN_HAND ? client.player.getMainHandStack() : client.player.getOffHandStack();
-
-            client.execute(() -> {
-                if (client.player == null) return;
-                if (stack.getItem() instanceof IdentityDiscItem discItem) {
-                    discItem.setBladeRetracted(stack, retracted);
-                    client.player.getInventory().markDirty();
-                }
-            });
-        });*/
 
         ClientPlayNetworking.registerGlobalReceiver(CHANGE_COLOR_LIGHTSUIT, (client, handler, buf, responseSender) -> {
             Vector3f color = buf.readVector3f();

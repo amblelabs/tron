@@ -27,7 +27,6 @@ public class TronAttachmentTypes {
             .initializer(() -> new Vector3f(1, 1, 1))
             .buildAndRegister(Tron.of("faction_color"));
 
-
     public static Encoder<Vector3f> vector3fEncoder() {
         return new Encoder<>() {
             @Override

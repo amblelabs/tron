@@ -5,6 +5,10 @@ import org.joml.Vector4f;
 
 import java.util.Arrays;
 
+/**
+ * Referenced from Immersive Aircraft, link below:
+ * <a href="https://github.com/Luke100000/ImmersiveAircraft/blob/1.20.1/common/src/main/java/immersive_aircraft/entity/misc/Trail.java#L6">...</a>
+ * **/
 public class Trail {
     public final float[] buffer;
     public final int size;

@@ -592,20 +592,16 @@ public class LightCycleModel extends EntityModel<LightCycleEntity> {
 	}
 
 	public static void transformMixinModel(float i, float j, PlayerEntityModel playerEntityModel) {
-
-		// Head angle - compensate for body lean so player can see forward
-		playerEntityModel.head.pitch = j * 0.017453292F + 0.35F;  // More upward tilt
+		playerEntityModel.head.pitch = j * 0.017453292F + 0.35F;
 		playerEntityModel.head.yaw = i * 0.017453292F;
 		playerEntityModel.head.roll = 0.0F;
 
-		// Body lean forward (slightly reduced for better visibility)
-		playerEntityModel.body.pitch = 1.2F;  // Reduced from 1.35F (about 69 degrees)
+		playerEntityModel.body.pitch = 1.2F;
 		playerEntityModel.body.yaw = 0.0F;
 		playerEntityModel.body.roll = 0.0F;
 
-		// Arms reaching forward to handlebars
-		playerEntityModel.rightArm.pitch = -0.65F;   // Adjusted from -0.7F
-		playerEntityModel.rightArm.yaw = 0.25F;      // Adjusted from 0.48F
+		playerEntityModel.rightArm.pitch = -0.65F;
+		playerEntityModel.rightArm.yaw = 0.25F;
 		playerEntityModel.rightArm.roll = 0.5F;
 
 		playerEntityModel.leftArm.pitch = -0.65F;
@@ -613,15 +609,14 @@ public class LightCycleModel extends EntityModel<LightCycleEntity> {
 		playerEntityModel.leftArm.roll = -0.5F;
 
 		// Legs straddling the bike
-		playerEntityModel.rightLeg.pitch = 0.8F;    // Adjusted from 0.9F
-		playerEntityModel.rightLeg.yaw = -0.5F;    // Adjusted from -0.21F
-		playerEntityModel.rightLeg.roll = 0.35F;    // Adjusted from 0.42F
+		playerEntityModel.rightLeg.pitch = 0.8F;
+		playerEntityModel.rightLeg.yaw = -0.5F;
+		playerEntityModel.rightLeg.roll = 0.35F;
 
 		playerEntityModel.leftLeg.pitch = 0.8F;
 		playerEntityModel.leftLeg.yaw = 0.5F;
 		playerEntityModel.leftLeg.roll = -0.35F;
 
-		// Re-sync overlay parts to avoid floating secondary layers
 		playerEntityModel.hat.copyTransform(playerEntityModel.head);
 		playerEntityModel.jacket.copyTransform(playerEntityModel.body);
 		playerEntityModel.rightSleeve.copyTransform(playerEntityModel.rightArm);

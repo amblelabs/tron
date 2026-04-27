@@ -11,7 +11,7 @@ public class LightCycleMovingSoundInstance extends MovingSoundInstance {
         super(TronSounds.LIGHTCYCLE_LOOP, SoundCategory.NEUTRAL, net.minecraft.util.math.random.Random.create());
         this.lightCycle = lightCycle;
         this.repeat = true;
-        this.repeatDelay = 50;
+        this.repeatDelay = 50; // Needs work
         this.volume = 0.0f;
         this.pitch = 1.0f;
         this.x = (float) lightCycle.getX();

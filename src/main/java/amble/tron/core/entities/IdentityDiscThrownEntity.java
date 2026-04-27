@@ -22,6 +22,7 @@ import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.hit.HitResult;
@@ -72,7 +73,7 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
     private float spin = 0.0f;                                      // angular speed (arbitrary units)
     // Return-to-owner state: when true, physics are disabled and the disc lerps to its owner.
     private boolean returningToOwner = false;
-    private static final double RETURN_SPEED = 0.6; // units per tick (adjust as needed)
+    private static final double RETURN_SPEED = 0.85; // units per tick (adjusted slightly faster)
     private static final double MAX_RETURN_DISTANCE = 40.0; // blocks
 
     public IdentityDiscThrownEntity(EntityType<IdentityDiscThrownEntity> entityType, World world) {
@@ -213,6 +214,16 @@ public class IdentityDiscThrownEntity extends PersistentProjectileEntity {
                 } else {
                     double step = Math.min(RETURN_SPEED, Math.max(0.1, dist * 0.2));
                     Vec3d move = toPlayer.normalize().multiply(step);
+
+                    // Keep the return path damaging by sweeping the movement segment for entities.
+                    Box sweptBox = this.getBoundingBox().stretch(move).expand(0.5);
+                    for (Entity target : this.getWorld().getOtherEntities(this, sweptBox, entity -> entity != owner && entity != this && entity instanceof LivingEntity)) {
+                        this.onEntityHit(new EntityHitResult(target));
+                        if (this.isRemoved()) {
+                            return;
+                        }
+                    }
+
                     Vec3d newPos = this.getPos().add(move);
                     this.setPos(newPos.x, newPos.y, newPos.z);
                     if (this.getWorld().isClient()) {

@@ -13,6 +13,11 @@ import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix3f;
 import org.joml.Vector3f;
 
+/**
+ * Referenced from Immersive Aircraft, link below:
+ * <a href="https://github.com/Luke100000/ImmersiveAircraft/blob/1.20.1/common/src/main/java/immersive_aircraft/client/render/entity/renderer/TrailRenderer.java">...</a>
+ * **/
+
 public class TrailRenderer {
     private static final Identifier identifier = Tron.of("textures/entity/trail.png");
 
@@ -102,14 +107,14 @@ public class TrailRenderer {
     }
 
     private static void vertex(Trail trail, VertexConsumer lineVertexConsumer, Matrix3f matrix, float u, float v, int index, Vec3d pos, float a, int light, Vector3f color, float ox, float oz) {
-        Vector3f p = new Vector3f((float) (trail.buffer[index] - pos.x) + ox, (float) (trail.buffer[index + 1] - pos.y), (float) (trail.buffer[index + 2] - pos.z) + oz);
+        Vector3f p = new Vector3f(
+                (float) (trail.buffer[index] - pos.x) + ox,
+                (float) (trail.buffer[index + 1] - pos.y),
+                (float) (trail.buffer[index + 2] - pos.z) + oz
+        );
+
         matrix.transform(p);
-        
-        // Multiply color by alpha for additive fading effect
-        float r = color.x;
-        float g = color.y;
-        float b = color.z;
-        
-        lineVertexConsumer.vertex(p.x, p.y, p.z, r, g, b, a, u, v, OverlayTexture.DEFAULT_UV, light, 1, 0, 0);
+
+        lineVertexConsumer.vertex(p.x, p.y, p.z, color.x, color.y, color.z, a, u, v, OverlayTexture.DEFAULT_UV, light, 1, 0, 0);
     }
 }
