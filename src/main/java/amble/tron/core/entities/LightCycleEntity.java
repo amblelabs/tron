@@ -91,6 +91,12 @@ public class LightCycleEntity extends LivingEntity {
             player.setYaw(this.getYaw());
             player.setPitch(this.getPitch());
             player.startRiding(this);
+
+            // Immediately sync the player's faction color to the bike
+            Vector3f factionColor = TronAttachmentUtil.getFactionColor(player);
+            if (factionColor != null) {
+                this.setColor(factionColor);
+            }
         }
     }
 
@@ -387,6 +393,13 @@ public class LightCycleEntity extends LivingEntity {
             }
 
         } else {
+            if (controllingPassenger instanceof PlayerEntity player) {
+                Vector3f factionColor = TronAttachmentUtil.getFactionColor(player);
+                if (factionColor != null && !factionColor.equals(this.getColor())) {
+                    this.setColor(factionColor);
+                }
+            }
+
             if (this.getSpawnTicks() > 0) {
                 this.setSpawnTicks(this.getSpawnTicks() - 1);
                 return; // Skip trail and collision detection during spawn animation
@@ -498,13 +511,6 @@ public class LightCycleEntity extends LivingEntity {
                         break;
                     }
                 }
-            }
-        }
-
-        if (controllingPassenger instanceof PlayerEntity player) {
-            Vector3f factionColor = TronAttachmentUtil.getFactionColor(player);
-            if (factionColor != null && !factionColor.equals(this.getColor())) {
-                this.setColor(factionColor);
             }
         }
     }
