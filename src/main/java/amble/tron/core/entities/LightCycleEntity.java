@@ -3,6 +3,7 @@ package amble.tron.core.entities;
 import amble.tron.client.sound.LightCycleMovingSoundInstance;
 import amble.tron.core.entities.lighttrail.Trail;
 import amble.tron.core.TronAttachmentUtil;
+import amble.tron.core.config.TronConfig;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.sound.SoundManager;
 import net.minecraft.entity.*;
@@ -61,10 +62,13 @@ public class LightCycleEntity extends LivingEntity {
     // Smooth turning with momentum
     private float yawVelocity = 0.0f;
     private boolean lastBeamActiveState = false;
+    private float lastLegacyYaw = 0.0f; // Track last yaw for legacy mode crash detection
     private boolean finalizingDeath;
     private boolean recallToBatonPending;
     @Nullable
     private UUID recallPlayerUuid;
+    // Prevent repeated 90-degree turns while holding the turn key in legacy mode
+    private boolean legacyTurnLock = false;
 
     @Override
     public double getMountedHeightOffset() {
@@ -484,7 +488,36 @@ public class LightCycleEntity extends LivingEntity {
 
                     // Use sweptBox to prevent tunneling
                     if (sweptBox.intersects(collider.box)) {
-                        collided = true;
+                        boolean countAsCollision;
+                        if (TronConfig.isLightcycleLegacyMode()) {
+                            // Legacy: default to NOT counting self-collisions; only count when
+                            // we detect a head-on approach.
+                            countAsCollision = false;
+
+                            Vec3d movement = new Vec3d(this.getX() - this.prevX, this.getY() - this.prevY, this.getZ() - this.prevZ);
+                            if (movement.lengthSquared() >= 1.0E-6) {
+                                double centerX = (collider.box.minX + collider.box.maxX) / 2.0;
+                                double centerZ = (collider.box.minZ + collider.box.maxZ) / 2.0;
+                                Vec3d toCenter = new Vec3d(centerX - this.getX(), 0.0, centerZ - this.getZ());
+                                if (toCenter.lengthSquared() < 1.0E-6) {
+                                    countAsCollision = true;
+                                } else {
+                                    Vec3d mvNorm = movement.normalize();
+                                    Vec3d tcNorm = toCenter.normalize();
+                                    double dot = mvNorm.dotProduct(tcNorm);
+                                    if (dot <= -0.5) {
+                                        countAsCollision = true;
+                                    }
+                                }
+                            }
+                        } else {
+                            // Non-legacy: keep existing behavior (self-collision counts)
+                            countAsCollision = true;
+                        }
+
+                        if (countAsCollision) {
+                            collided = true;
+                        }
                     }
                 }
             }
@@ -522,6 +555,19 @@ public class LightCycleEntity extends LivingEntity {
         float sidewaysInput = controllingPlayer.sidewaysSpeed;
         boolean isBraking = forwardInput < -0.1F;
 
+        if (TronConfig.isLightcycleLegacyMode()) {
+            // 1980s Grid-Aligned Mode
+            tickControlledLegacy(controllingPlayer, forwardInput, sidewaysInput, isBraking);
+        } else {
+            // Modern Mode (existing logic)
+            tickControlledModern(controllingPlayer, forwardInput, sidewaysInput, isBraking);
+        }
+    }
+
+    /**
+     * Modern lightcycle movement with smooth steering and diagonal movement
+     */
+    private void tickControlledModern(PlayerEntity controllingPlayer, float forwardInput, float sidewaysInput, boolean isBraking) {
         // Calculate current speed for turn rate scaling
         Vec3d currentVel = this.getVelocity();
         double currentSpeed = Math.sqrt(currentVel.x * currentVel.x + currentVel.z * currentVel.z);
@@ -591,7 +637,7 @@ public class LightCycleEntity extends LivingEntity {
             double rightComp = vel.dotProduct(rightVec);
 
             // Skidding: when turning hard while braking or at high speed, reduce grip
-            boolean isTurningHard = Math.abs(this.yawVelocity) > maxTurnRate * 0.5F;
+            boolean isTurningHard = Math.abs(this.yawVelocity) > 4.0F * 0.5F;
             double lateralDamping;
 
             if (isBraking && isTurningHard) {
@@ -643,7 +689,120 @@ public class LightCycleEntity extends LivingEntity {
             this.setVelocity(vel);
             this.move(MovementType.PLAYER, new Vec3d(vel.x, vel.y, vel.z));
         }
+    }
 
+    /**
+     * 1980s grid-aligned movement: right angles only, snapped to block grid
+     * Like the original Tron arcade game - continuous movement with crash on actual collision
+     */
+    private void tickControlledLegacy(PlayerEntity controllingPlayer, float forwardInput, float sidewaysInput, boolean isBraking) {
+        // Snap current yaw to nearest cardinal direction (0, 90, 180, 270)
+        float wrappedYaw = MathHelper.wrapDegrees(this.getYaw());
+        float nearestCardinal = Math.round(wrappedYaw / 90.0f) * 90.0f;
+        this.setYaw(nearestCardinal);
+
+        // Determine intended direction based on INPUT ONLY (forward/back takes priority)
+        float targetYaw = nearestCardinal;
+        boolean hasForwardInput = false;
+
+        if (Math.abs(forwardInput) > 0.1f) {
+            // Forward/Backward movement
+            if (forwardInput < -0.1f) {
+                // Backing up: reverse direction
+                targetYaw = MathHelper.wrapDegrees(nearestCardinal + 180.0f);
+            }
+            hasForwardInput = true;
+        }
+
+        // Only process sideways input if NOT providing forward input (arcade game style)
+        boolean sidewaysActive = !hasForwardInput && Math.abs(sidewaysInput) > 0.1f;
+        boolean performedTurnThisTick = false;
+        if (sidewaysActive) {
+            // Only perform a turn when the player *presses* the turn key (edge-detect)
+            if (!this.legacyTurnLock) {
+                if (sidewaysInput > 0.1f) {
+                    // Strafe right: turn 90 degrees clockwise
+                    targetYaw = MathHelper.wrapDegrees(nearestCardinal - 90.0f);
+                } else {
+                    // Strafe left: turn 90 degrees counter-clockwise
+                    targetYaw = MathHelper.wrapDegrees(nearestCardinal + 90.0f);
+                }
+                performedTurnThisTick = true;
+            } else {
+                // Holding the turn key: ignore additional turn actions
+                targetYaw = nearestCardinal;
+            }
+        }
+        // Update the lock: set when we performed a turn; clear when no sideways input
+        if (sidewaysActive) {
+            if (performedTurnThisTick) {
+                this.legacyTurnLock = true;
+            }
+            // if we didn't perform a turn this tick we leave the lock as-is so holding the key
+            // doesn't repeatedly trigger new turns
+        } else {
+            this.legacyTurnLock = false;
+        }
+
+        // Snap target to cardinal direction
+        targetYaw = Math.round(MathHelper.wrapDegrees(targetYaw) / 90.0f) * 90.0f;
+
+        // Check if attempting a 90-degree turn
+        float yawDiff = MathHelper.wrapDegrees(targetYaw - this.getYaw());
+        if (Math.abs(yawDiff) > 45.0f) {
+            // 90-degree turn detected - check if there's actually a trail to collide with
+            // In legacy mode, crashing only happens when hitting your own trail
+            // This will be handled by the normal collision detection in tick()
+            // For now, allow the turn but don't move - the collision system will handle it
+            this.setYaw(targetYaw);
+            this.lastLegacyYaw = targetYaw;
+
+            // Keep player rotation in sync but don't move
+            controllingPlayer.setYaw(targetYaw);
+            Vec2f rot = this.getControlledRotation(controllingPlayer);
+            this.setRotation(targetYaw, rot.x);
+            this.bodyYaw = this.headYaw = targetYaw;
+
+            // Stop moving for this tick to allow collision detection
+            this.setVelocity(Vec3d.ZERO);
+            this.move(MovementType.PLAYER, Vec3d.ZERO);
+            return;
+        }
+
+        // Update yaw to target
+        this.setYaw(targetYaw);
+        this.lastLegacyYaw = targetYaw;
+
+        // Synchronize player yaw with bike (not affected by camera look)
+        controllingPlayer.setYaw(targetYaw);
+
+        Vec2f rot = this.getControlledRotation(controllingPlayer);
+        this.setRotation(targetYaw, rot.x);
+        this.bodyYaw = this.headYaw = targetYaw;
+
+        if (this.isLogicalSideForUpdatingMovement()) {
+            // Legacy: Continuous movement in current direction (0.4 blocks per tick)
+            double moveSpeed = 0.4;
+
+            // Stop if heavily braking (use provided isBraking flag to avoid unused param warning)
+            if (isBraking || forwardInput < -0.3f) {
+                moveSpeed = 0.0;
+            }
+
+            double yawRad = Math.toRadians(targetYaw);
+            double vx = -Math.sin(yawRad) * moveSpeed;
+            double vz = Math.cos(yawRad) * moveSpeed;
+
+            Vec3d vel = new Vec3d(vx, 0.0, vz);
+
+            // Snap position to grid (0.5 offset for block centers)
+            double snapX = Math.round(this.getX() * 2.0) / 2.0;
+            double snapZ = Math.round(this.getZ() * 2.0) / 2.0;
+            this.setPosition(snapX, this.getY(), snapZ);
+
+            this.setVelocity(vel);
+            this.move(MovementType.PLAYER, vel);
+        }
     }
 
     protected Vec2f getControlledRotation(LivingEntity controllingPassenger) {
@@ -755,6 +914,7 @@ public class LightCycleEntity extends LivingEntity {
             nbt.putUuid("RecallPlayer", this.recallPlayerUuid);
         }
         nbt.putBoolean("BeamActive", this.isBeamActive());
+        nbt.putFloat("LastLegacyYaw", this.lastLegacyYaw);
         nbt.put("VisualTrail", this.visualTrail.toNbt());
 
         NbtList points = new NbtList();
@@ -802,6 +962,9 @@ public class LightCycleEntity extends LivingEntity {
         }
         if (nbt.contains("BeamActive")) {
             this.setBeamActive(nbt.getBoolean("BeamActive"));
+        }
+        if (nbt.contains("LastLegacyYaw")) {
+            this.lastLegacyYaw = nbt.getFloat("LastLegacyYaw");
         }
         if (nbt.contains("VisualTrail", 10)) {
             this.visualTrail.fromNbt(nbt.getCompound("VisualTrail"));

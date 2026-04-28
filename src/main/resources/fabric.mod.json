@@ -29,6 +29,9 @@
       ],
       "amblekit-client": [
         "amble.tron.init.client.AmbleClientInitializer"
+      ],
+      "modmenu": [
+        "amble.tron.client.modmenu.TronModMenuIntegration"
       ]
 	},
 	"mixins": [
