@@ -31,6 +31,10 @@ import java.util.LinkedList;
 import java.util.UUID;
 
 public class LightCycleEntity extends LivingEntity {
+    private static final double TRAIL_HALF_THICKNESS = 0.05D;
+    private static final double TRAIL_BOTTOM_OFFSET = 0.1D;
+    private static final double TRAIL_TOP_OFFSET = 1.1D;
+    private static final int TRAIL_SELF_COLLISION_DELAY = 2;
     private static final TrackedData<Vector3f> FACTION_COLOR = DataTracker.registerData(LightCycleEntity.class, TrackedDataHandlerRegistry.VECTOR3F);
     private static final TrackedData<Boolean> BEAM_ACTIVE = DataTracker.registerData(LightCycleEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
     private static final TrackedData<Integer> SPAWN_TICKS = DataTracker.registerData(LightCycleEntity.class, TrackedDataHandlerRegistry.INTEGER);
@@ -65,6 +69,8 @@ public class LightCycleEntity extends LivingEntity {
     private float lastLegacyYaw = 0.0f; // Track last yaw for legacy mode crash detection
     private boolean finalizingDeath;
     private boolean recallToBatonPending;
+    // When recalling the baton we want to clear trails on finalize; preserved otherwise
+    private boolean recallShouldClearTrail = false;
     @Nullable
     private UUID recallPlayerUuid;
     // Prevent repeated 90-degree turns while holding the turn key in legacy mode
@@ -149,6 +155,87 @@ public class LightCycleEntity extends LivingEntity {
         this.visualTrail.add(v1, v2, 0.0f);
     }
 
+    private Vec3d getLegacyBackPoint(float yawDegrees) {
+        double yawRad = Math.toRadians(yawDegrees);
+        double backX = this.getX() + Math.sin(yawRad) * 1.5;
+        double backZ = this.getZ() - Math.cos(yawRad) * 1.5;
+
+        float card = Math.round(MathHelper.wrapDegrees(yawDegrees) / 90.0f) * 90.0f;
+        if (((int) card % 180) == 0) {
+            backX = Math.round(backX * 2.0) / 2.0;
+        } else {
+            backZ = Math.round(backZ * 2.0) / 2.0;
+        }
+
+        return new Vec3d(backX, this.getY(), backZ);
+    }
+
+    private Vec3d getLegacyCornerPoint(Vec3d previousBackPoint, Vec3d currentBackPoint, float previousYawDegrees) {
+        float card = Math.round(MathHelper.wrapDegrees(previousYawDegrees) / 90.0f) * 90.0f;
+        if (((int) card % 180) == 0) {
+            return new Vec3d(previousBackPoint.x, currentBackPoint.y, currentBackPoint.z);
+        }
+        return new Vec3d(currentBackPoint.x, currentBackPoint.y, previousBackPoint.z);
+    }
+
+    private Vector4f makeTrailBottomPoint(Vec3d point) {
+        return this.makeTrailPoint(point, TRAIL_BOTTOM_OFFSET, false);
+    }
+
+    private Vector4f makeTrailTopPoint(Vec3d point) {
+        return this.makeTrailPoint(point, TRAIL_TOP_OFFSET, true);
+    }
+
+    private Vector4f makeTrailPoint(Vec3d point, double yOffset, boolean isTop) {
+        double tiltRad = Math.toRadians(this.tilt);
+        double yawRad = Math.toRadians(this.getYaw());
+
+        // Apply tilt as a perpendicular offset (bike leans, beam tilts with it)
+        // Tilt is applied to both top and bottom, but in opposite directions for a realistic lean
+        double tiltAmount = 0.0;
+        if (isTop) {
+            tiltAmount = Math.sin(tiltRad) * -1.4f;  // Top of beam moves more when tilted
+        } else {
+            tiltAmount = Math.sin(tiltRad) * 0.1;  // Bottom of beam moves slightly opposite
+        }
+
+        // Right vector relative to bike facing
+        double rightX = Math.cos(yawRad);
+        double rightZ = Math.sin(yawRad);
+
+        double offsetX = rightX * tiltAmount;
+        double offsetZ = rightZ * tiltAmount;
+        return new Vector4f((float) (point.x + offsetX), (float) (point.y + yOffset), (float) (point.z + offsetZ), 1.0f);
+    }
+
+    private Box createTrailColliderBox(Vec3d from, Vec3d to) {
+        double minX = Math.min(from.x, to.x) - TRAIL_HALF_THICKNESS;
+        double maxX = Math.max(from.x, to.x) + TRAIL_HALF_THICKNESS;
+        double minZ = Math.min(from.z, to.z) - TRAIL_HALF_THICKNESS;
+        double maxZ = Math.max(from.z, to.z) + TRAIL_HALF_THICKNESS;
+        double minY = Math.min(from.y, to.y) + TRAIL_BOTTOM_OFFSET;
+        double maxY = Math.max(from.y, to.y) + TRAIL_TOP_OFFSET;
+        return new Box(minX, minY, minZ, maxX, maxY, maxZ);
+    }
+
+    private void appendTrailPoint(Vec3d point, float alpha, boolean createCollider) {
+        this.visualTrail.add(this.makeTrailBottomPoint(point), this.makeTrailTopPoint(point), alpha);
+
+        if (createCollider && !this.serverTrailPoints.isEmpty()) {
+            Vec3d previousPoint = this.serverTrailPoints.getFirst();
+            Box segmentBox = this.createTrailColliderBox(previousPoint, point);
+            this.serverTrailColliders.addFirst(new TrailCollider(segmentBox, this.trailSegmentCounter++));
+            if (this.serverTrailColliders.size() > 512) {
+                this.serverTrailColliders.removeLast();
+            }
+        }
+
+        this.serverTrailPoints.addFirst(point);
+        if (this.serverTrailPoints.size() > 513) {
+            this.serverTrailPoints.removeLast();
+        }
+    }
+
     public Vector3f getColor() {
         return this.dataTracker.get(FACTION_COLOR);
     }
@@ -199,7 +286,6 @@ public class LightCycleEntity extends LivingEntity {
         }
         this.setDeathTicks(DEATH_ANIMATION_TICKS);
         this.setBeamActive(false);
-        this.clearTrailState();
         if (dismountNow) {
             this.removeAllPassengers();
         }
@@ -212,6 +298,8 @@ public class LightCycleEntity extends LivingEntity {
         }
 
         this.recallToBatonPending = true;
+        // Mark that on finalize we should clear the world's trail for this cycle
+        this.recallShouldClearTrail = true;
         this.recallPlayerUuid = player.getUuid();
         this.beginDeathAnimation(false);
     }
@@ -283,10 +371,16 @@ public class LightCycleEntity extends LivingEntity {
                     this.recallToBatonPending = false;
                     this.recallPlayerUuid = null;
                 }
+                    // If recall requested we clear the trail now; otherwise preserve it so
+                    // trails persist across death/relog.
+                    if (this.recallShouldClearTrail) {
+                        this.clearTrailState();
+                        this.recallShouldClearTrail = false;
+                    }
 
-                this.finalizingDeath = true;
-                super.kill();
-                this.finalizingDeath = false;
+                    this.finalizingDeath = true;
+                    super.kill();
+                    this.finalizingDeath = false;
             }
             return;
         }
@@ -320,28 +414,24 @@ public class LightCycleEntity extends LivingEntity {
             float targetTilt = net.minecraft.util.math.MathHelper.clamp(deltaYaw * 3.5f, -45.0f, 45.0f);
             this.tilt = net.minecraft.util.math.MathHelper.lerp(0.3f, this.tilt, targetTilt);
 
-            double yawRad = Math.toRadians(this.getYaw());
-
-            // Adjust the offset behind the cycle
-            double backX = this.getX() + Math.sin(yawRad) * 1.5;
-            double backZ = this.getZ() - Math.cos(yawRad) * 1.5;
-            double y = this.getY();
-
-            // Calculate tilted up-vector logic for the beam
-            double tiltRad = Math.toRadians(this.tilt);
-            double upX = -Math.sin(tiltRad) * Math.cos(yawRad);
-            double upY = Math.cos(tiltRad);
-            double upZ = -Math.sin(tiltRad) * Math.sin(yawRad);
-
-            // Height of the trail slice (e.g. from y+0.1 to y+1.1)
-            Vector4f v1 = new Vector4f((float) (backX + upX * 0.1), (float) (y + upY * 0.1), (float) (backZ + upZ * 0.1), 1.0f);
-            Vector4f v2 = new Vector4f((float) (backX + upX * 1.1), (float) (y + upY * 1.1), (float) (backZ + upZ * 1.1), 1.0f);
-
+            float currentYaw = MathHelper.wrapDegrees(this.getYaw());
             double speedSq = (this.getX() - this.prevX) * (this.getX() - this.prevX) + (this.getZ() - this.prevZ) * (this.getZ() - this.prevZ);
             boolean isEmitting = (this.getVelocity().lengthSquared() > 0.01 || speedSq > 0.001) && this.isBeamActive();
-            // Only add segments while actively emitting so existing trail chunks persist instead of rapidly fading out.
+
             if (isEmitting) {
-                this.getVisualTrail().add(v1, v2, 1.0f);
+                boolean legacyMode = TronConfig.isLightcycleLegacyMode();
+                Vec3d currentPoint = legacyMode
+                        ? this.getLegacyBackPoint(currentYaw)
+                        : new Vec3d(this.getX() + Math.sin(Math.toRadians(this.getYaw())) * 1.5, this.getY(), this.getZ() - Math.cos(Math.toRadians(this.getYaw())) * 1.5);
+
+                if (legacyMode && !this.serverTrailPoints.isEmpty() && Math.abs(MathHelper.wrapDegrees(currentYaw - this.prevYaw)) > 0.1f) {
+                    Vec3d corner = this.getLegacyCornerPoint(this.serverTrailPoints.getFirst(), currentPoint, this.prevYaw);
+                    if (this.serverTrailPoints.getFirst().squaredDistanceTo(corner) > 1.0E-4) {
+                        this.appendTrailPoint(corner, 1.0f, true);
+                    }
+                }
+
+                this.appendTrailPoint(currentPoint, 1.0f, true);
             }
 
             SoundManager soundManager = MinecraftClient.getInstance().getSoundManager();
@@ -356,32 +446,6 @@ public class LightCycleEntity extends LivingEntity {
                 this.movingInstance = null;
             }
             
-            // Client-side physics colliders for prediction
-            if (isEmitting) {
-                Vec3d curPoint = new Vec3d(backX, this.getY(), backZ);
-
-                if (!this.serverTrailPoints.isEmpty()) {
-                    Vec3d prevPoint = this.serverTrailPoints.getFirst();
-                    double minX = Math.min(prevPoint.x, curPoint.x) - 0.2;
-                    double maxX = Math.max(prevPoint.x, curPoint.x) + 0.2;
-                    double minY = Math.min(prevPoint.y, curPoint.y);
-                    double maxY = Math.max(prevPoint.y, curPoint.y) + 1.2;
-                    double minZ = Math.min(prevPoint.z, curPoint.z) - 0.2;
-                    double maxZ = Math.max(prevPoint.z, curPoint.z) + 0.2;
-                    Box segmentBox = new Box(minX, minY, minZ, maxX, maxY, maxZ);
-
-                    this.serverTrailColliders.addFirst(new TrailCollider(segmentBox, this.trailSegmentCounter++));
-                    if (this.serverTrailColliders.size() > 512) {
-                        this.serverTrailColliders.removeLast();
-                    }
-                }
-
-                this.serverTrailPoints.addFirst(curPoint);
-                if (this.serverTrailPoints.size() > 513) {
-                    this.serverTrailPoints.removeLast();
-                }
-            }
-
             // Client-side canKill logic for visual prediction (matches server logic)
             for (TrailCollider collider : this.serverTrailColliders) {
                 collider.age++;
@@ -410,52 +474,29 @@ public class LightCycleEntity extends LivingEntity {
             }
 
             boolean beamActive = this.isBeamActive();
-            Vec3d backPos = new Vec3d(this.getX() + Math.sin(Math.toRadians(this.getYaw())) * 1.5, this.getY(), this.getZ() - Math.cos(Math.toRadians(this.getYaw())) * 1.5);
+            int emissionCutoff = this.trailSegmentCounter;
+            float currentYaw = MathHelper.wrapDegrees(this.getYaw());
+            Vec3d currentPoint = TronConfig.isLightcycleLegacyMode()
+                    ? this.getLegacyBackPoint(currentYaw)
+                    : new Vec3d(this.getX() + Math.sin(Math.toRadians(this.getYaw())) * 1.5, this.getY(), this.getZ() - Math.cos(Math.toRadians(this.getYaw())) * 1.5);
 
             // Stop emitting while off, but keep existing colliders so disconnected visible trail chunks can still damage.
             if (!beamActive) {
                 this.serverTrailPoints.clear();
-            }
-
-
-            // Create collision boxes (matching logic from working commit fdf8da5)
-            boolean shouldAddBox = false;
-            if (beamActive) {
-                if (this.serverTrailPoints.isEmpty()) {
-                    shouldAddBox = true;
-                } else {
-                    Vec3d lastPoint = this.serverTrailPoints.getFirst();
-                    if (lastPoint.squaredDistanceTo(backPos) > 0.05) {
-                        shouldAddBox = true;
-                    }
-                }
-            }
-
-            if (shouldAddBox) {
-                if (!this.serverTrailPoints.isEmpty()) {
-                    Vec3d prevPoint = this.serverTrailPoints.getFirst();
-                    double minX = Math.min(prevPoint.x, backPos.x) - 0.2;
-                    double maxX = Math.max(prevPoint.x, backPos.x) + 0.2;
-                    double minY = Math.min(prevPoint.y, backPos.y);
-                    double maxY = Math.max(prevPoint.y, backPos.y) + 1.2;
-                    double minZ = Math.min(prevPoint.z, backPos.z) - 0.2;
-                    double maxZ = Math.max(prevPoint.z, backPos.z) + 0.2;
-                    Box segmentBox = new Box(minX, minY, minZ, maxX, maxY, maxZ);
-
-                    this.serverTrailColliders.addFirst(new TrailCollider(segmentBox, this.trailSegmentCounter++));
-                    if (this.serverTrailColliders.size() > 512) {
-                        this.serverTrailColliders.removeLast();
+            } else {
+                boolean legacyMode = TronConfig.isLightcycleLegacyMode();
+                if (legacyMode && !this.serverTrailPoints.isEmpty() && Math.abs(MathHelper.wrapDegrees(currentYaw - this.prevYaw)) > 0.1f) {
+                    Vec3d corner = this.getLegacyCornerPoint(this.serverTrailPoints.getFirst(), currentPoint, this.prevYaw);
+                    if (this.serverTrailPoints.getFirst().squaredDistanceTo(corner) > 1.0E-4) {
+                        this.appendTrailPoint(corner, 1.0f, true);
                     }
                 }
 
-                this.serverTrailPoints.addFirst(backPos);
-                if (this.serverTrailPoints.size() > 513) {
-                    this.serverTrailPoints.removeLast();
-                }
+                this.appendTrailPoint(currentPoint, 1.0f, true);
             }
 
             Box myBox = this.getBoundingBox();
-            Box sweptBox = myBox.union(new Box(this.prevX - this.getWidth()/2, this.prevY, this.prevZ - this.getWidth()/2, this.prevX + this.getWidth()/2, this.prevY + this.getHeight(), this.prevZ + this.getWidth()/2));
+            Box sweptBox = myBox.union(new Box(this.prevX - this.getWidth()/2, this.prevY, this.prevZ - this.getWidth()/2, this.prevX + this.getWidth()/2, this.prevY + this.getHeight(), this.prevZ + this.getWidth()/2)).expand(TRAIL_HALF_THICKNESS);
 
             boolean collided = false;
 
@@ -467,10 +508,14 @@ public class LightCycleEntity extends LivingEntity {
                     double boxCenterZ = (collider.box.minZ + collider.box.maxZ) / 2.0;
                     double distSq = (this.getX() - boxCenterX) * (this.getX() - boxCenterX) + (this.getZ() - boxCenterZ) * (this.getZ() - boxCenterZ);
 
-                    // Age > 4 ticks OR distance > 0.8 blocks squared (from working commit)
-                    if (collider.age > 4 || distSq > 0.8) {
+                    // Age-based arming keeps the newly emitted beam non-lethal; only already-emitted trail can kill.
+                    if (collider.age > TRAIL_SELF_COLLISION_DELAY || distSq > 0.8) {
                         collider.canKill = true;
                     }
+                }
+
+                if (TronConfig.isLightcycleLegacyMode() && collider.segmentIndex >= emissionCutoff) {
+                    continue;
                 }
 
                 if (collider.canKill) {
@@ -486,38 +531,8 @@ public class LightCycleEntity extends LivingEntity {
                         }
                     }
 
-                    // Use sweptBox to prevent tunneling
-                    if (sweptBox.intersects(collider.box)) {
-                        boolean countAsCollision;
-                        if (TronConfig.isLightcycleLegacyMode()) {
-                            // Legacy: default to NOT counting self-collisions; only count when
-                            // we detect a head-on approach.
-                            countAsCollision = false;
-
-                            Vec3d movement = new Vec3d(this.getX() - this.prevX, this.getY() - this.prevY, this.getZ() - this.prevZ);
-                            if (movement.lengthSquared() >= 1.0E-6) {
-                                double centerX = (collider.box.minX + collider.box.maxX) / 2.0;
-                                double centerZ = (collider.box.minZ + collider.box.maxZ) / 2.0;
-                                Vec3d toCenter = new Vec3d(centerX - this.getX(), 0.0, centerZ - this.getZ());
-                                if (toCenter.lengthSquared() < 1.0E-6) {
-                                    countAsCollision = true;
-                                } else {
-                                    Vec3d mvNorm = movement.normalize();
-                                    Vec3d tcNorm = toCenter.normalize();
-                                    double dot = mvNorm.dotProduct(tcNorm);
-                                    if (dot <= -0.5) {
-                                        countAsCollision = true;
-                                    }
-                                }
-                            }
-                        } else {
-                            // Non-legacy: keep existing behavior (self-collision counts)
-                            countAsCollision = true;
-                        }
-
-                        if (countAsCollision) {
-                            collided = true;
-                        }
+                    if (collider.canKill && sweptBox.intersects(collider.box)) {
+                        collided = true;
                     }
                 }
             }
@@ -747,31 +762,22 @@ public class LightCycleEntity extends LivingEntity {
         // Snap target to cardinal direction
         targetYaw = Math.round(MathHelper.wrapDegrees(targetYaw) / 90.0f) * 90.0f;
 
-        // Check if attempting a 90-degree turn
-        float yawDiff = MathHelper.wrapDegrees(targetYaw - this.getYaw());
-        if (Math.abs(yawDiff) > 45.0f) {
-            // 90-degree turn detected - check if there's actually a trail to collide with
-            // In legacy mode, crashing only happens when hitting your own trail
-            // This will be handled by the normal collision detection in tick()
-            // For now, allow the turn but don't move - the collision system will handle it
-            this.setYaw(targetYaw);
-            this.lastLegacyYaw = targetYaw;
-
-            // Keep player rotation in sync but don't move
-            controllingPlayer.setYaw(targetYaw);
-            Vec2f rot = this.getControlledRotation(controllingPlayer);
-            this.setRotation(targetYaw, rot.x);
-            this.bodyYaw = this.headYaw = targetYaw;
-
-            // Stop moving for this tick to allow collision detection
-            this.setVelocity(Vec3d.ZERO);
-            this.move(MovementType.PLAYER, Vec3d.ZERO);
-            return;
-        }
-
-        // Update yaw to target
+        // Update yaw to target (discrete 90-degree steps are handled above)
+        // Do NOT pause movement here; collision detection uses a forward probe so we
+        // can turn immediately while still detecting head-on collisions.
         this.setYaw(targetYaw);
         this.lastLegacyYaw = targetYaw;
+
+        // When turning in legacy mode, shift the bike ~0.5 blocks in the turn direction
+        float yawDelta = MathHelper.wrapDegrees(targetYaw - nearestCardinal);
+        if (Math.abs(yawDelta) > 0.1f && this.isLogicalSideForUpdatingMovement()) {
+            double turnShiftDist = 0;
+            double turnDir = yawDelta > 0 ? -90.0 : 90.0;
+            double shiftYaw = Math.toRadians(this.getYaw() + turnDir);
+            double shiftX = Math.sin(shiftYaw) * turnShiftDist;
+            double shiftZ = -Math.cos(shiftYaw) * turnShiftDist;
+            this.setPosition(this.getX() + shiftX, this.getY(), this.getZ() + shiftZ);
+        }
 
         // Synchronize player yaw with bike (not affected by camera look)
         controllingPlayer.setYaw(targetYaw);
@@ -780,7 +786,7 @@ public class LightCycleEntity extends LivingEntity {
         this.setRotation(targetYaw, rot.x);
         this.bodyYaw = this.headYaw = targetYaw;
 
-        if (this.isLogicalSideForUpdatingMovement()) {
+            if (this.isLogicalSideForUpdatingMovement()) {
             // Legacy: Continuous movement in current direction (0.4 blocks per tick)
             double moveSpeed = 0.4;
 
@@ -793,7 +799,8 @@ public class LightCycleEntity extends LivingEntity {
             double vx = -Math.sin(yawRad) * moveSpeed;
             double vz = Math.cos(yawRad) * moveSpeed;
 
-            Vec3d vel = new Vec3d(vx, 0.0, vz);
+            // Preserve vertical velocity so gravity still applies while in legacy mode.
+            Vec3d vel = new Vec3d(vx, this.getVelocity().y, vz);
 
             // Snap position to grid (0.5 offset for block centers)
             double snapX = Math.round(this.getX() * 2.0) / 2.0;
