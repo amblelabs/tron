@@ -157,8 +157,8 @@ public class LightCycleEntity extends LivingEntity {
 
     private Vec3d getLegacyBackPoint(float yawDegrees) {
         double yawRad = Math.toRadians(yawDegrees);
-        double backX = this.getX() + Math.sin(yawRad) * 1.5;
-        double backZ = this.getZ() - Math.cos(yawRad) * 1.5;
+        double backX = this.getX() + Math.sin(yawRad) * 0.8;
+        double backZ = this.getZ() - Math.cos(yawRad) * 0.8;
 
         float card = Math.round(MathHelper.wrapDegrees(yawDegrees) / 90.0f) * 90.0f;
         if (((int) card % 180) == 0) {
@@ -193,10 +193,13 @@ public class LightCycleEntity extends LivingEntity {
         // Apply tilt as a perpendicular offset (bike leans, beam tilts with it)
         // Tilt is applied to both top and bottom, but in opposite directions for a realistic lean
         double tiltAmount = 0.0;
-        if (isTop) {
-            tiltAmount = Math.sin(tiltRad) * -1.4f;  // Top of beam moves more when tilted
-        } else {
-            tiltAmount = Math.sin(tiltRad) * 0.1;  // Bottom of beam moves slightly opposite
+        boolean legacyMode = TronConfig.isLightcycleLegacyMode();
+        if (!legacyMode) {
+            if (isTop) {
+                tiltAmount = Math.sin(tiltRad) * -1.4f;  // Top of beam moves more when tilted
+            } else {
+                tiltAmount = Math.sin(tiltRad) * 0.1;  // Bottom of beam moves slightly opposite
+            }
         }
 
         // Right vector relative to bike facing
@@ -408,18 +411,20 @@ public class LightCycleEntity extends LivingEntity {
             this.lastBeamActiveState = beamActiveNow;
         }
 
+
         if (this.getWorld().isClient()) {
             this.prevTilt = this.tilt;
+            boolean legacyMode = TronConfig.isLightcycleLegacyMode();
+
             float deltaYaw = net.minecraft.util.math.MathHelper.wrapDegrees(this.getYaw() - this.prevYaw);
             float targetTilt = net.minecraft.util.math.MathHelper.clamp(deltaYaw * 3.5f, -45.0f, 45.0f);
-            this.tilt = net.minecraft.util.math.MathHelper.lerp(0.3f, this.tilt, targetTilt);
+            if (!legacyMode) this.tilt = net.minecraft.util.math.MathHelper.lerp(0.3f, this.tilt, targetTilt);
 
             float currentYaw = MathHelper.wrapDegrees(this.getYaw());
             double speedSq = (this.getX() - this.prevX) * (this.getX() - this.prevX) + (this.getZ() - this.prevZ) * (this.getZ() - this.prevZ);
             boolean isEmitting = (this.getVelocity().lengthSquared() > 0.01 || speedSq > 0.001) && this.isBeamActive();
 
             if (isEmitting) {
-                boolean legacyMode = TronConfig.isLightcycleLegacyMode();
                 Vec3d currentPoint = legacyMode
                         ? this.getLegacyBackPoint(currentYaw)
                         : new Vec3d(this.getX() + Math.sin(Math.toRadians(this.getYaw())) * 1.5, this.getY(), this.getZ() - Math.cos(Math.toRadians(this.getYaw())) * 1.5);
