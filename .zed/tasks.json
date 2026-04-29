@@ -1,0 +1,22 @@
+[
+  {
+    "label": "Gradle: Run Client (runClient)",
+    "command": "./gradlew runClient",
+    "reveal": "always",
+  },
+  {
+    "label": "Gradle: Build Project",
+    "command": "./gradlew build",
+    "reveal": "always",
+  },
+  {
+    "label": "Gradle: Clean",
+    "command": "./gradlew clean",
+    "reveal": "always",
+  },
+  {
+    "label": "Gradle: Test Current File",
+    "command": "./gradlew test --tests $ZED_STEM",
+    "reveal": "always",
+  },
+]
