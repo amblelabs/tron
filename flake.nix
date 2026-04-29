@@ -10,6 +10,7 @@
       systems = import inputs.systems;
 
       perSystem = { config, self', pkgs, lib, system, ... }: let
+        # JetBrains OpenJDK is excellent for MC modding due to DCEVM hotswapping support.
         java = pkgs.jetbrains.jdk-no-jcef;
 
         nativeBuildInputs = with pkgs; [
@@ -17,7 +18,8 @@
           git
         ];
 
-        buildInputs = with pkgs; [
+        # Library dependencies for Minecraft & LWJGL runtime loading
+        lwjglLibraries = with pkgs; [
           libGL
           glfw
           xorg.libX11
@@ -26,17 +28,37 @@
           xorg.libXrandr
           xorg.libXxf86vm
           xorg.xrandr
-          glfw-wayland-minecraft # Not always needed, but in case it is, it's here.
           flite # TTS
           libpulseaudio # Required for audio
         ];
       in {
         devShells.default = pkgs.mkShell {
-          inherit nativeBuildInputs buildInputs;
+          # 1. Provide all native build tools
+          nativeBuildInputs = nativeBuildInputs;
 
+          # 2. Consolidate your project dependencies & tooling here
+          buildInputs = lwjglLibraries ++ (with pkgs; [
+            # Ensure the specific Java 21 LTS is available alongside JetBrains JDK if needed
+            jdk21 
+            jdt-language-server
+            gradle
+          ]);
+
+          # 3. Environment variables
           env = {
-            LD_LIBRARY_PATH = lib.makeLibraryPath buildInputs;
+            # LWJGL needs this path to successfully load native dynamically-linked files (.so) on NixOS
+            LD_LIBRARY_PATH = lib.makeLibraryPath lwjglLibraries;
             JAVA_HOME = "${java.home}";
+
+            # --- FIX FOR ZED JDTLS ---
+            # Tells dynamically linked binaries (like Zed's lsp proxy) where the interpreter is
+	    NIX_LD = "${pkgs.glibc}/lib/ld-linux-x86-64.so.2";
+            
+            # Appends the standard libraries needed by generic Linux binaries to your existing LD path
+            NIX_LD_LIBRARY_PATH = lib.makeLibraryPath [
+              pkgs.stdenv.cc.cc
+              pkgs.zlib
+            ];
           };
         };
       };
