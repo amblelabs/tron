@@ -11,8 +11,8 @@ import net.minecraft.item.Item;
 
 public class TronItems extends ItemContainer {
     @SuppressWarnings("unused")
-    public static Item LIGHTSUIT = new LightSuitItem(ArmorMaterials.IRON, ArmorItem.Type.CHESTPLATE, new AItemSettings().maxDamage(100000));
+    public static Item LIGHTSUIT = new LightSuitItem(ArmorMaterials.IRON, ArmorItem.Type.CHESTPLATE, new AItemSettings().maxDamage(100000).group(TronItemGroups.MAIN));
 
-    public static Item IDENTITY_DISC = new IdentityDiscItem(new AItemSettings().maxCount(1));
-    public static Item LIGHTCYCLE_BATON = new LightcycleBatonItem(new AItemSettings().maxCount(1));
+    public static Item IDENTITY_DISC = new IdentityDiscItem(new AItemSettings().maxCount(1).group(TronItemGroups.MAIN));
+    public static Item LIGHTCYCLE_BATON = new LightcycleBatonItem(new AItemSettings().maxCount(1).group(TronItemGroups.MAIN));
 }

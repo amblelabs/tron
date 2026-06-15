@@ -28,6 +28,7 @@ public class Tron implements ModInitializer {
 	public void onInitialize() {
         RegistryContainer.register(TronItems.class, MOD_ID);
         RegistryContainer.register(TronEntities.class, MOD_ID);
+        RegistryContainer.register(TronItemGroups.class, MOD_ID);
         TronAttachmentTypes.init();
         TronSounds.init();
         CommandRegistrationCallback.EVENT.register(((commandDispatcher, commandRegistryAccess, registrationEnvironment) -> {
