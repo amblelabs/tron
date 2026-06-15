@@ -1,0 +1,31 @@
+package amble.tron.mixin;
+
+import amble.tron.core.entities.LightCycleEntity;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.option.Perspective;
+import net.minecraft.client.render.GameRenderer;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.RotationAxis;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+@Mixin(GameRenderer.class)
+public class GameRendererMixin {
+    @Inject(method = "renderWorld", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/GameRenderer;bobView(Lnet/minecraft/client/util/math/MatrixStack;F)V"))
+    private void tron$renderWorld(float tickDelta, long limitTime, MatrixStack matrices, CallbackInfo ci) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player != null && client.player.getVehicle() instanceof LightCycleEntity cycle) {
+            float currentTilt = MathHelper.lerp(tickDelta, cycle.prevTilt, cycle.tilt);
+
+            // First-person: camera locked to bike tilt (full tilt)
+            // Third-person: subtle tilt effect (40%)
+            boolean isFirstPerson = client.options.getPerspective() == Perspective.FIRST_PERSON;
+            float tiltMultiplier = isFirstPerson ? 1.0f : 0.4f;
+
+            matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-currentTilt * tiltMultiplier));
+        }
+    }
+}

@@ -1,20 +1,16 @@
 package amble.tron.core.items;
 
 import amble.tron.Tron;
-import amble.tron.core.TronAttachmentTypes;
 import amble.tron.core.TronAttachmentUtil;
 import amble.tron.core.entities.IdentityDiscThrownEntity;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.ItemCooldownManager;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -28,13 +24,16 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.TypedActionResult;
 import net.minecraft.world.World;
 import org.joml.Vector3f;
+import net.minecraft.entity.attribute.EntityAttribute;
+import net.minecraft.entity.attribute.EntityAttributeModifier;
+import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.entity.EquipmentSlot;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.ImmutableMultimap;
 
-public class IdentityDiscItem extends Item {
+public class IdentityDiscItem extends Item implements TronColor {
     public static final Identifier CHANGE_COLOR = Tron.of("change_color");
     public static final Identifier RETRACT_BLADE = Tron.of("retract_blade");
-    private static final String red = "X";
-    private static final String green = "Y";
-    private static final String blue = "Z";
     private static final String bladeRetracted = "bladeRetracted";
 
     static  {
@@ -70,8 +69,8 @@ public class IdentityDiscItem extends Item {
         if (!(world instanceof ServerWorld)) return;
         if (entity instanceof ServerPlayerEntity player && stack.getItem() instanceof IdentityDiscItem) {
             Vector3f factionColor = TronAttachmentUtil.getFactionColor(player);
-            if (this.getRGB(stack) != factionColor) {
-                this.setRGB(player, TronAttachmentUtil.getFactionColor(player), stack);
+            if (!this.getRGB(stack).equals(factionColor)) {
+                this.setRGB(player, factionColor, stack);
             }
         }
     }
@@ -92,19 +91,10 @@ public class IdentityDiscItem extends Item {
         ClientPlayNetworking.send(IdentityDiscItem.RETRACT_BLADE, buf);
     }
 
-    protected void __setBladeRetracted(ItemStack stack, boolean retract) {
+    public void __setBladeRetracted(ItemStack stack, boolean retract) {
         if (!(stack.getItem() instanceof IdentityDiscItem)) return;
         NbtCompound nbt = stack.getOrCreateNbt();
         nbt.putBoolean(bladeRetracted, retract);
-    }
-
-    public Vector3f getRGB(ItemStack stack) {
-        if (!(stack.getItem() instanceof IdentityDiscItem)) return new Vector3f(1, 1, 1);
-        NbtCompound nbt = stack.getOrCreateNbt();
-        if (nbt.contains(red) && nbt.contains(green) && nbt.contains(blue)) {
-            return new Vector3f(nbt.getFloat(red), nbt.getFloat(green), nbt.getFloat(blue));
-        }
-        return new Vector3f(1, 1, 1);
     }
 
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
@@ -129,12 +119,21 @@ public class IdentityDiscItem extends Item {
         return TypedActionResult.success(itemStack, world.isClient());
     }
 
-    public Item getDefaultItem() {
-        return Items.SNOWBALL;
-    }
-
     public SoundEvent getDefaultSound() {
         return SoundEvents.ITEM_TRIDENT_THROW;
+    }
+
+    @Override
+    public Multimap<EntityAttribute, EntityAttributeModifier> getAttributeModifiers(ItemStack stack, EquipmentSlot slot) {
+        if (slot == EquipmentSlot.MAINHAND && !isBladeRetracted(stack)) {
+            ImmutableMultimap.Builder<EntityAttribute, EntityAttributeModifier> builder = ImmutableMultimap.builder();
+            builder.put(EntityAttributes.GENERIC_ATTACK_DAMAGE, new EntityAttributeModifier(
+                    ATTACK_DAMAGE_MODIFIER_ID, "Weapon modifier", 8.0, EntityAttributeModifier.Operation.ADDITION));
+            builder.put(EntityAttributes.GENERIC_ATTACK_SPEED, new EntityAttributeModifier(
+                    ATTACK_SPEED_MODIFIER_ID, "Weapon modifier", -2.4, EntityAttributeModifier.Operation.ADDITION));
+            return builder.build();
+        }
+        return super.getAttributeModifiers(stack, slot);
     }
 
     public void setRGB(ServerPlayerEntity player, Vector3f vector3f, ItemStack stack) {

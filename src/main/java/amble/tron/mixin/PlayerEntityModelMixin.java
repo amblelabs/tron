@@ -1,6 +1,8 @@
 package amble.tron.mixin;
 
+import amble.tron.client.models.LightCycleModel;
 import amble.tron.core.items.LightSuitItem;
+import net.minecraft.client.model.ModelPart;
 import net.minecraft.client.render.entity.model.BipedEntityModel;
 import net.minecraft.client.render.entity.model.PlayerEntityModel;
 import net.minecraft.entity.EquipmentSlot;
@@ -16,6 +18,11 @@ public class PlayerEntityModelMixin<T extends LivingEntity, M extends BipedEntit
     public void tron$setAngles(T livingEntity, float f, float g, float h, float i, float j, CallbackInfo ci) {
         PlayerEntityModel model = (PlayerEntityModel) (Object) this;
         boolean bl = livingEntity.getEquippedStack(EquipmentSlot.CHEST).getItem() instanceof LightSuitItem;
+
+        if (livingEntity.getVehicle() instanceof amble.tron.core.entities.LightCycleEntity cycle) {
+            LightCycleModel.transformMixinModel(i, j, model);
+        }
+
         //model.hat.visible = !bl;
         model.jacket.visible = !bl;
         model.rightSleeve.visible = !bl;

@@ -1,0 +1,80 @@
+package amble.tron.client.render.entity.renderer;
+
+import amble.tron.Tron;
+import amble.tron.client.models.LightCycleModel;
+import amble.tron.core.entities.LightCycleEntity;
+import net.minecraft.client.render.*;
+import net.minecraft.client.render.entity.EntityRenderer;
+import net.minecraft.client.render.entity.EntityRendererFactory;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.RotationAxis;
+import org.joml.Vector3f;
+
+public class LightCycleEntityRenderer<T extends LightCycleEntity> extends EntityRenderer<T> {
+
+    private final LightCycleModel model;
+
+    public LightCycleEntityRenderer(EntityRendererFactory.Context ctx) {
+        super(ctx);
+        this.model = new LightCycleModel(LightCycleModel.getTexturedModelData().createModel());
+    }
+
+    @Override
+    public void render(T entity, float yaw, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
+        if (entity.isInvisible()) {
+            return;
+        }
+
+        float phaseProgress = entity.isDying()
+                ? (1.0f - entity.getDeathProgress(tickDelta))
+                : entity.getSpawnProgress(tickDelta);
+        float lineAlpha = net.minecraft.util.math.MathHelper.clamp(1.0f - phaseProgress * 3.0f, 0.0f, 1.0f);
+        float quadAlpha = net.minecraft.util.math.MathHelper.clamp(1.0f - Math.abs(phaseProgress * 3.0f - 1.0f), 0.0f, 1.0f);
+        float modelAlpha = net.minecraft.util.math.MathHelper.clamp(phaseProgress * 3.0f - 2.0f, 0.0f, 1.0f);
+
+        matrices.push();
+        matrices.multiply(RotationAxis.NEGATIVE_Y.rotationDegrees(yaw));
+
+        float currentTilt = net.minecraft.util.math.MathHelper.lerp(tickDelta, entity.prevTilt, entity.tilt);
+        matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(currentTilt));
+
+        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(180f));
+        matrices.translate(0, -1.5, 0);
+
+        if (lineAlpha > 0.0f) {
+            this.model.render(matrices, vertexConsumers.getBuffer(RenderLayer.getLines()), light, OverlayTexture.DEFAULT_UV, 1, 1, 1, lineAlpha);
+        }
+
+        if (quadAlpha > 0.0f) {
+            this.model.render(matrices, vertexConsumers.getBuffer(RenderLayer.getDebugQuads()), light, OverlayTexture.DEFAULT_UV, 1, 1, 1, quadAlpha);
+        }
+
+        if (modelAlpha > 0.0f) {
+            this.model.render(matrices, vertexConsumers.getBuffer(RenderLayer.getEntityCutout(this.getTexture(entity))), light, OverlayTexture.DEFAULT_UV, 1, 1, 1, modelAlpha);
+        }
+
+        Vector3f color = entity.getColor();
+        this.model.render(matrices, vertexConsumers.getBuffer(RenderLayer.getEyes(this.getEmission())), light, OverlayTexture.DEFAULT_UV, color.x, color.y, color.z, 1);
+        matrices.pop();
+
+        // Render light trail
+        TrailRenderer.render(entity.getVisualTrail(), vertexConsumers, matrices.peek(), color);
+
+        super.render(entity, yaw, tickDelta, matrices, vertexConsumers, light);
+    }
+
+    @Override
+    public boolean shouldRender(T entity, Frustum frustum, double x, double y, double z) {
+        return !entity.isInvisible() && entity.isAlive();
+    }
+
+    @Override
+    public Identifier getTexture(T entity) {
+        return Tron.of("textures/entity/lightcycle.png");
+    }
+
+    public Identifier getEmission() {
+        return Tron.of("textures/entity/lightcycle_emission.png");
+    }
+}

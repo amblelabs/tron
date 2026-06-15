@@ -11,6 +11,11 @@ import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.Hand;
 import org.lwjgl.glfw.GLFW;
 
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import amble.tron.Tron;
+import amble.tron.core.entities.LightCycleEntity;
+
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.util.InputUtil;
 
@@ -35,6 +40,30 @@ public class Keybindings {
                 discItem.setBladeRetracted(stack, !discItem.isBladeRetracted(stack));
                 player.getInventory().markDirty();
                 player.playSound(SoundEvents.ITEM_AXE_SCRAPE, 0.5f, 0.8f);
+            }
+        }));
+
+        register(new KeyBind.Held("toggle_beam", "main", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_V, client -> {
+            ClientPlayerEntity player = client.player;
+
+            if (player == null)
+                return;
+
+            if (player.getVehicle() instanceof LightCycleEntity) {
+                ClientPlayNetworking.send(Tron.of("toggle_beam"), PacketByteBufs.empty());
+                player.playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.5f, 1.0f);
+            }
+        }));
+
+        register(new KeyBind.Held("recall_baton", "main", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_B, client -> {
+            ClientPlayerEntity player = client.player;
+
+            if (player == null)
+                return;
+
+            if (player.getVehicle() instanceof LightCycleEntity) {
+                ClientPlayNetworking.send(Tron.of("recall_baton"), PacketByteBufs.empty());
+                player.playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.5f, 0.8f);
             }
         }));
     }

@@ -1,7 +1,9 @@
 package amble.tron.client;
 
 import amble.tron.Tron;
+import amble.tron.client.render.LightcycleBatonThrownItemRenderer;
 import amble.tron.client.render.IdentityDiscThrownItemRenderer;
+import amble.tron.client.render.entity.renderer.LightCycleEntityRenderer;
 import amble.tron.core.Keybindings;
 import amble.tron.core.TronAttachmentTypes;
 import amble.tron.core.TronEntities;
@@ -26,12 +28,15 @@ public class TronClient implements ClientModInitializer {
         TronAttachmentTypes.init();
         Keybindings.init();
         EntityRendererRegistry.register(TronEntities.IDENTITY_DISC, IdentityDiscThrownItemRenderer::new);
+        EntityRendererRegistry.register(TronEntities.LIGHTCYCLE_BATON_THROWN, LightcycleBatonThrownItemRenderer::new);
+        EntityRendererRegistry.register(TronEntities.LIGHT_CYCLE, LightCycleEntityRenderer::new);
         registerClientReceivers();
     }
 
+    @SuppressWarnings("UnstableApiUsage")
     private void registerClientReceivers() {
         ClientPlayNetworking.registerGlobalReceiver(ATTACHMENT_UPDATE, (client, handler, buf, responseSender) -> {
-            Identifier attachmentId = buf.readIdentifier(); // must match the server order
+            Identifier attachmentId = buf.readIdentifier();
             int targetId = buf.readInt();
             float x = buf.readFloat();
             float y = buf.readFloat();
@@ -65,19 +70,6 @@ public class TronClient implements ClientModInitializer {
                 }
             });
         });
-
-        /*ClientPlayNetworking.registerGlobalReceiver(RETRACT_BLADE, (client, handler, buf, responseSender) -> {
-            boolean retracted = buf.readBoolean();
-            ItemStack stack = client.player.getActiveHand() == Hand.MAIN_HAND ? client.player.getMainHandStack() : client.player.getOffHandStack();
-
-            client.execute(() -> {
-                if (client.player == null) return;
-                if (stack.getItem() instanceof IdentityDiscItem discItem) {
-                    discItem.setBladeRetracted(stack, retracted);
-                    client.player.getInventory().markDirty();
-                }
-            });
-        });*/
 
         ClientPlayNetworking.registerGlobalReceiver(CHANGE_COLOR_LIGHTSUIT, (client, handler, buf, responseSender) -> {
             Vector3f color = buf.readVector3f();

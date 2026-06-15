@@ -1,7 +1,6 @@
 package amble.tron.client.render;
 
-import amble.tron.core.entities.IdentityDiscThrownEntity;
-import amble.tron.core.items.IdentityDiscItem;
+import amble.tron.core.entities.LightcycleBatonThrownEntity;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.render.Frustum;
@@ -16,70 +15,31 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RotationAxis;
 
-/**
- * @author Loqor
- * @license GNU General Public License v3.0
- */
-@Environment(value=EnvType.CLIENT)
-public class IdentityDiscThrownItemRenderer<T extends Entity>
-        extends EntityRenderer<T> {
-    private static final float MIN_DISTANCE = 10.25f;
+@Environment(EnvType.CLIENT)
+public class LightcycleBatonThrownItemRenderer<T extends Entity> extends EntityRenderer<T> {
     private final ItemRenderer itemRenderer;
-    private final float scale;
-    private final boolean lit;
 
-    public IdentityDiscThrownItemRenderer(EntityRendererFactory.Context ctx, float scale, boolean lit) {
+    public LightcycleBatonThrownItemRenderer(EntityRendererFactory.Context ctx) {
         super(ctx);
         this.itemRenderer = ctx.getItemRenderer();
-        this.scale = scale;
-        this.lit = lit;
-    }
-
-    public IdentityDiscThrownItemRenderer(EntityRendererFactory.Context context) {
-        this(context, 1.0f, false);
-    }
-
-    @Override
-    protected int getBlockLight(T entity, BlockPos pos) {
-        return this.lit ? 15 : super.getBlockLight(entity, pos);
     }
 
     @Override
     public void render(T entity, float yaw, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
-
-        if (!(entity instanceof IdentityDiscThrownEntity flyingItem)) {
+        if (!(entity instanceof LightcycleBatonThrownEntity baton)) {
             return;
         }
 
-        boolean bl = !flyingItem.isInGround();
-
         matrices.push();
-        matrices.translate(0, 0.25f, 0);
-        matrices.scale(0.8f, 0.8f, 0.8f);
+        matrices.translate(0.0, 0.1, 0.0);
+        matrices.scale(0.75f, 0.75f, 0.75f);
         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(180 + entity.getYaw()));
         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(entity.getPitch()));
         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(90));
-        matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(45));
-        if (bl) {
-            float spinAngle = (float) (entity.age * entity.getVelocity().lengthSquared() * 2.0f);
-            float sinAngle = (float) (Math.sin(entity.age * 0.1) * 45.0f);
-            matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(sinAngle));
-            matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(spinAngle));
-        }
 
-        ItemStack original = flyingItem.asItemStack();
-        if (!(original.getItem() instanceof IdentityDiscItem disc)) {
-            matrices.pop();
-            super.render(entity, yaw, tickDelta, matrices, vertexConsumers, light);
-            return;
-        }
-
-        ItemStack renderStack = original.copy();
-        disc.__setRGB(flyingItem.getColor(), renderStack);
-
+        ItemStack renderStack = baton.asItemStack();
         this.itemRenderer.renderItem(
                 renderStack,
                 ModelTransformationMode.FIXED,
@@ -104,3 +64,6 @@ public class IdentityDiscThrownItemRenderer<T extends Entity>
         return SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE;
     }
 }
+
+
+

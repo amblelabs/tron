@@ -14,6 +14,9 @@
     "requireAnnotations": true
   },
   "client": [
+    "GameRendererMixin",
+    "HeldItemRendererMixin",
+    "LivingEntityRendererMixin",
     "MinecraftClientMixin",
     "PlayerEntityModelMixin"
   ]
